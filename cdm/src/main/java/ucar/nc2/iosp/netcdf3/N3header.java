@@ -31,15 +31,19 @@
  */
 package ucar.nc2.iosp.netcdf3;
 
-import ucar.ma2.*;
-import ucar.nc2.*;
-import ucar.nc2.constants.CDM;
-import ucar.nc2.iosp.AbstractIOServiceProvider;
-import ucar.unidata.io.RandomAccessFile;
-
-import java.util.*;
 import java.io.IOException;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.Formatter;
+import java.util.List;
+
+import ucar.ma2.Array;
+import ucar.ma2.DataType;
+import ucar.ma2.IndexIterator;
+import ucar.ma2.InvalidRangeException;
+import ucar.nc2.*;
+import ucar.nc2.constants.CDM;
+import ucar.unidata.io.RandomAccessFile;
 
 /**
  * Netcdf header reading and writing for version 3 file format.
@@ -54,7 +58,6 @@ public class N3header {
 
   static final byte[] MAGIC = new byte[]{0x43, 0x44, 0x46, 0x01};
   static final byte[] MAGIC_LONG = new byte[]{0x43, 0x44, 0x46, 0x02}; // 64-bit offset format : only affects the variable offset value
-  static final byte[] MAGIC_NETCDH = new byte[]{0x43, 0x44, 0x48, 0x01}; // Uniplot files
   static final int MAGIC_DIM = 10;
   static final int MAGIC_VAR = 11;
   static final int MAGIC_ATT = 12;
@@ -65,7 +68,7 @@ public class N3header {
     byte[] b = new byte[4];
     raf.readFully(b);
     for (int i = 0; i < 3; i++)
-      if (b[i] != MAGIC[i] && b[i] != MAGIC_NETCDH[i])
+      if (b[i] != MAGIC[i])
         return false;
     return ((b[3] == 1) || (b[3] == 2));
   }
@@ -97,14 +100,38 @@ public class N3header {
 
   private Charset valueCharset = CDM.utf8Charset;
 
-  private boolean isNetCDH = false;
-
   /* Notes
     - dimensions are signed or unsigned ? in java, must be signed, so are limited to 2^31, not 2^32
     " Each fixed-size variable and the data for one record's worth of a single record variable are limited in size to a little less
      that 4 GiB, which is twice the size limit in versions earlier than netCDF 3.6."
    */
 
+  /**
+   * Gets the byte order. Method is overwitten by {@link UniplotN3header}
+   * 
+   * @return the byte order
+   */
+  protected int getByteOrder() {
+    return RandomAccessFile.BIG_ENDIAN;
+  }
+
+  /**
+   * Returns the header magic. Method is overwritten by {@link UniplotN3header}
+   * @return
+   */
+  protected byte[] getMagic() {
+    return MAGIC;
+  }
+
+  protected void setValueCharset(final Charset valueCharset) {
+    this.valueCharset = valueCharset;
+  }
+  
+  protected Charset getValueCharset() {
+    return valueCharset;
+  }
+
+  
   /**
    * Read the header and populate the ncfile
    *
@@ -125,31 +152,20 @@ public class N3header {
 
     // netcdf magic number
     long pos = 0;
+    raf.order(getByteOrder());
     raf.seek(pos);
 
     byte[] b = new byte[4];
     raf.readFully(b);
 
-    isNetCDH = false;
+    final byte[] magic = getMagic();
     for (int i = 0; i < 3; i++) {
-      if (b[i] != MAGIC[i] && b[i] != MAGIC_NETCDH[i])
-        throw new IOException("Not a netCDF/netCDH file " + raf.getLocation());
-      if (i == 2 && b[i] == MAGIC_NETCDH[i])
-        isNetCDH = true;
+      if (b[i] != magic[i])
+        throw new IOException("Not a " + ncfile.getFileTypeDescription() + " file: " + raf.getLocation());
     }
 
-    Object valueCharsetProperty = ncfile.getImportProperty(AbstractIOServiceProvider.PROP_VALUE_CHARSET);
-    if (valueCharsetProperty instanceof Charset)
-      this.valueCharset = (Charset) valueCharsetProperty;
-    else if (isNetCDH)
-      // Uniplot writes in ISO-8859-1
-      this.valueCharset = Charset.forName("ISO-8859-1");
-
-    int byteOrder = isNetCDH ? RandomAccessFile.LITTLE_ENDIAN : RandomAccessFile.BIG_ENDIAN;
-    raf.order(byteOrder);
-
     if ((b[3] != 1) && (b[3] != 2))
-      throw new IOException("Not a netCDF file "+raf.getLocation());
+      throw new IOException("Not a " + ncfile.getFileTypeDescription() + " file: " + raf.getLocation());
     useLongOffset = (b[3] == 2);
 
     // number of records
@@ -162,11 +178,11 @@ public class N3header {
 
     // dimensions
     int numdims = 0;
-    int magic = raf.readInt();
-    if (magic == 0) {
+    final int magicDim = raf.readInt();
+    if (magicDim == 0) {
       raf.readInt(); // skip 32 bits
     } else {
-      if (magic != MAGIC_DIM)
+      if (magicDim != MAGIC_DIM)
         throw new IOException("Misformed netCDF file - dim magic number wrong "+raf.getLocation());
       numdims = raf.readInt();
       if (fout != null) fout.format("numdims= %d%n", numdims);
@@ -194,11 +210,11 @@ public class N3header {
 
     // variables
     int nvars = 0;
-    magic = raf.readInt();
-    if (magic == 0) {
+    final int magicVar = raf.readInt();
+    if (magicVar == 0) {
       raf.readInt(); // skip 32 bits
     } else {
-      if (magic != MAGIC_VAR)
+      if (magicVar != MAGIC_VAR)
         throw new IOException("Misformed netCDF file  - var magic number wrong "+raf.getLocation());
       nvars = raf.readInt();
       if (fout != null) fout.format("numdims= %d%n", numdims);
@@ -353,10 +369,6 @@ public class N3header {
       }
     }
 
-  }
-
-  public boolean isNetCDH() {
-    return isNetCDH;
   }
 
   long calcFileSize() {
@@ -659,7 +671,7 @@ public class N3header {
 
     // magic number
     raf.seek(0);
-    raf.write(largeFile ? N3header.MAGIC_LONG : N3header.MAGIC);
+    raf.write(largeFile ? N3header.MAGIC_LONG : getMagic());
 
     // numrecs
     raf.writeInt(0);

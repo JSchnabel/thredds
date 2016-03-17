@@ -159,9 +159,6 @@ public class H5header {
     this.ncfile = ncfile;
     this.raf = myRaf;
     this.h5iosp = h5iosp;
-    Object valueCharsetProperty = ncfile.getImportProperty(ucar.nc2.iosp.AbstractIOServiceProvider.PROP_VALUE_CHARSET);
-    if (valueCharsetProperty instanceof Charset)
-      this.valueCharset = (Charset) valueCharsetProperty;
   }
 
   public byte getSizeOffsets() {
@@ -170,6 +167,10 @@ public class H5header {
 
   boolean isNetcdf4() {
     return isNetcdf4;
+  }
+  
+  protected void setValueCharset(final Charset valueCharset) {
+    this.valueCharset = valueCharset;
   }
 
   public void read(java.io.PrintWriter debugPS) throws IOException {
@@ -1165,7 +1166,7 @@ public class H5header {
       if (b[count] == 0) break;
       count++;
     }
-    return new String(b, start, count - start, valueCharset); // all strings are considered to be UTF-8 unicode
+    return new String(b, start, count - start, valueCharset);
   }
 
   protected Array convertEnums(Map<Integer, String> map, DataType dataType, Array values) {

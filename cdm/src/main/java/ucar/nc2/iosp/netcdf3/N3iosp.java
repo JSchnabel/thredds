@@ -43,6 +43,7 @@ import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 import java.io.*;
 import java.nio.channels.WritableByteChannel;
+import java.nio.charset.Charset;
 
 /**
  * IOServiceProvider implementation abstract base class to read/write "version 3" netcdf files.
@@ -425,7 +426,7 @@ public String NC_check_name(String name) {
 
     // its a netcdf-3 file
     raf.order(RandomAccessFile.BIG_ENDIAN);
-    header = new N3header();
+    header = newHeader();
 
     header.read(raf, ncfile, null); // read header here
     //numrecs = header.numrecs;
@@ -435,6 +436,19 @@ public String NC_check_name(String name) {
     _open(raf);
 
     ncfile.finish();
+  }
+
+  /**
+   * Creates a new header instance and initializes it with the current value
+   * charset if assigned. This method is overwritten by {@link UniplotN3iosp}.
+   * 
+   * @return the new header instance
+   */
+  protected N3header newHeader() {
+    final N3header header = new N3header();
+    if (customValueCharset != null)
+      header.setValueCharset(customValueCharset);
+    return header;
   }
 
 
@@ -648,6 +662,8 @@ public String NC_check_name(String name) {
   protected boolean fill = true;
   protected HashMap dimHash = new HashMap(50);
 
+  private Charset customValueCharset;
+
   @Override
   public void create(String filename, ucar.nc2.NetcdfFile ncfile, int extra, long preallocateSize, boolean largeFile) throws IOException {
     this.ncfile = ncfile;
@@ -664,7 +680,7 @@ public String NC_check_name(String name) {
       myRaf.setLength(preallocateSize);
     }
 
-    header = new N3header();
+    header = newHeader();
     header.create(raf, ncfile, extra, largeFile, null);
 
     //recsize = header.recsize;   // record size
@@ -948,21 +964,25 @@ public String NC_check_name(String name) {
 
   @Override
   public Object sendIospMessage(Object message) {
-    if (null == header)
-      return null;
-    if (message == NetcdfFile.IOSP_MESSAGE_ADD_RECORD_STRUCTURE)
-      return header.makeRecordStructure();
-    else if (message == NetcdfFile.IOSP_MESSAGE_REMOVE_RECORD_STRUCTURE)
-      return header.removeRecordStructure();
+    if (message instanceof Charset) {
+      customValueCharset = (Charset) message;
+      if (header != null) {
+        header.setValueCharset((Charset) message);
+      }
+      return true;
+    }
+    if (header != null) {
+      if (message == NetcdfFile.IOSP_MESSAGE_ADD_RECORD_STRUCTURE)
+        return header.makeRecordStructure();
+      else if (message == NetcdfFile.IOSP_MESSAGE_REMOVE_RECORD_STRUCTURE)
+        return header.removeRecordStructure();
+    }
 
     return super.sendIospMessage(message);
   }
 
   @Override
   public String getFileTypeId() {
-    if (header.isNetCDH()) {
-      return DataFormatType.NETCDH.getDescription();
-    }
     return DataFormatType.NETCDF.getDescription();
   }
 

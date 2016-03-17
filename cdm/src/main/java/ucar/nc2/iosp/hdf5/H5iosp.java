@@ -34,7 +34,6 @@ package ucar.nc2.iosp.hdf5;
 
 import ucar.nc2.constants.DataFormatType;
 import ucar.ma2.*;
-
 import ucar.nc2.constants.CDM;
 import ucar.nc2.time.CalendarDate;
 import ucar.unidata.io.RandomAccessFile;
@@ -46,6 +45,7 @@ import ucar.nc2.*;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.Charset;
 import java.util.Formatter;
 
 /**
@@ -117,12 +117,16 @@ public class H5iosp extends AbstractIOServiceProvider {
   private boolean isEos;
   boolean includeOriginalAttributes = false;
 
+  private Charset customValueCharset = null;
+
   /////////////////////////////////////////////////////////////////////////////
   // reading
 
   public void open(RandomAccessFile raf, ucar.nc2.NetcdfFile ncfile, ucar.nc2.util.CancelTask cancelTask) throws IOException {
     super.open(raf, ncfile, cancelTask);
     headerParser = new H5header(this.raf, ncfile, this);
+    if (customValueCharset != null)
+      headerParser.setValueCharset(customValueCharset);
     headerParser.read(null);
 
     // check if its an HDF5-EOS file
@@ -584,6 +588,13 @@ public class H5iosp extends AbstractIOServiceProvider {
 
   // debug
   public Object sendIospMessage(Object message) {
+    if (message instanceof Charset) {
+      customValueCharset = (Charset) message;
+      if (headerParser != null) {
+        headerParser.setValueCharset((Charset) message);
+      }
+      return true;
+    }
     if (message.toString().equals(IOSP_MESSAGE_INCLUDE_ORIGINAL_ATTRIBUTES)) {
       includeOriginalAttributes = true;
       return null;
