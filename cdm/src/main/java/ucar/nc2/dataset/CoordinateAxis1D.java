@@ -68,7 +68,6 @@ public class CoordinateAxis1D extends CoordinateAxis {
   static private org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CoordinateAxis1D.class);
 
   private boolean wasRead = false; // have the data values been  read
-  private boolean wasCalcRegular = false; // have we checked if the data is regularly spaced ?
   private boolean wasBoundsDone = false; // have we created the bounds arrays if exists ?
   private boolean isInterval = false; // is this an interval coordinates - then should use bounds
   private boolean isAscending;
@@ -80,6 +79,10 @@ public class CoordinateAxis1D extends CoordinateAxis {
   // defer making until asked, use makeBounds()
   private double[] edge; // n+1 edges, edge[k] < midpoint[k] < edge[k+1]
   private double[] bound1, bound2; // may be contiguous or not
+
+  private boolean wasCalcRegular = false; // have we checked if the data is regularly spaced ?
+  private boolean isRegular = false;
+  private double start, increment;
 
   /**
    * Create a 1D coordinate axis from an existing Variable
@@ -109,8 +112,11 @@ public class CoordinateAxis1D extends CoordinateAxis {
     this.isInterval = org.isInterval();
     this.isRegular = org.isRegular();
 
-    this.coords = org.getCoordValues();
-    this.edge = org.getCoordEdges();
+    if(isNumeric()){
+    	this.coords = org.getCoordValues();
+    	this.edge = org.getCoordEdges();
+    }
+    
     this.names = org.names;
 
     if (isInterval) {
@@ -153,36 +159,38 @@ public class CoordinateAxis1D extends CoordinateAxis {
     int len = r.length();
 
     // deal with the midpoints, bounds
-    double[] new_mids = new double[len];
-    for (int idx = 0; idx < len; idx++) {
-      int old_idx = r.element(idx);
-      new_mids[idx] = coords[old_idx];
-    }
-    result.coords = new_mids;
-
-    if (isInterval) {
-      double[] new_bound1 = new double[len];
-      double[] new_bound2 = new double[len];
-      double[] new_edge = new double[len+1];
-      for (int idx = 0; idx < len; idx++) {
-        int old_idx = r.element(idx);
-        new_bound1[idx] = bound1[old_idx];
-        new_bound2[idx] = bound2[old_idx];
-        new_edge[idx] = bound1[old_idx];
-        new_edge[idx+1] = bound2[old_idx]; // all but last are overwritten
-      }
-      result.bound1 = new_bound1;
-      result.bound2 = new_bound2;
-      result.edge = new_edge;
-
-    } else {
-      double[] new_edge = new double[len+1];
-      for (int idx = 0; idx < len; idx++) {
-        int old_idx = r.element(idx);
-        new_edge[idx] = edge[old_idx];
-        new_edge[idx+1] = edge[old_idx+1]; // all but last are overwritten
-      }
-      result.edge = new_edge;
+    if(isNumeric()){
+	    double[] new_mids = new double[len];
+	    for (int idx = 0; idx < len; idx++) {
+	      int old_idx = r.element(idx);
+	      new_mids[idx] = coords[old_idx];
+	    }
+	    result.coords = new_mids;
+	
+	    if (isInterval) {
+	      double[] new_bound1 = new double[len];
+	      double[] new_bound2 = new double[len];
+	      double[] new_edge = new double[len+1];
+	      for (int idx = 0; idx < len; idx++) {
+	        int old_idx = r.element(idx);
+	        new_bound1[idx] = bound1[old_idx];
+	        new_bound2[idx] = bound2[old_idx];
+	        new_edge[idx] = bound1[old_idx];
+	        new_edge[idx+1] = bound2[old_idx]; // all but last are overwritten
+	      }
+	      result.bound1 = new_bound1;
+	      result.bound2 = new_bound2;
+	      result.edge = new_edge;
+	
+	    } else {
+	      double[] new_edge = new double[len+1];
+	      for (int idx = 0; idx < len; idx++) {
+	        int old_idx = r.element(idx);
+	        new_edge[idx] = edge[old_idx];
+	        new_edge[idx+1] = edge[old_idx+1]; // all but last are overwritten
+	      }
+	      result.edge = new_edge;
+	    }
     }
 
     if (names != null) {
@@ -193,6 +201,9 @@ public class CoordinateAxis1D extends CoordinateAxis {
       }
       result.names = new_names;
     }
+
+    result.wasCalcRegular = false;
+    result.calcIsRegular();
 
     return result;
   }
@@ -229,7 +240,7 @@ public class CoordinateAxis1D extends CoordinateAxis {
      int n = getDimension(0).getLength();
      List<NamedObject> names = new ArrayList<>(n);
      for (int i = 0; i < n; i++)
-       names.add(new ucar.nc2.util.NamedAnything(getCoordName(i), getUnitsString()));
+       names.add(new ucar.nc2.util.NamedAnything(getCoordName(i), getShortName() + " "+ getUnitsString()));
      return names;
    }
 
@@ -659,8 +670,6 @@ public class CoordinateAxis1D extends CoordinateAxis {
 
   ///////////////////////////////////////////////////////////////////////////////
   // check if Regular
-  private boolean isRegular = false;
-  private double start, increment;
 
   /**
    * Get starting value if isRegular()

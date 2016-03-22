@@ -10,6 +10,7 @@ import org.apache.http.Header;
 import org.apache.http.HttpStatus;
 import ucar.httpservices.HTTPFactory;
 import ucar.httpservices.HTTPMethod;
+import ucar.httpservices.HTTPUtil;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -175,11 +176,11 @@ public class HttpDSP extends D4DSP
     callServer(String methodurl)
         throws DapException
     {
-        URL url;
+        URI uri;
 
         try {
-            url = new URL(methodurl);
-        } catch (MalformedURLException mue) {
+            uri = HTTPUtil.parseToURI(methodurl);
+        } catch (URISyntaxException mue) {
             throw new DapException("Malformed url: " + methodurl);
         }
 
@@ -187,11 +188,11 @@ public class HttpDSP extends D4DSP
         long stop = 0;
         this.status = 0;
         HTTPMethod method = null;
-        try {   // Note that we cannot use try with resources because we exort the method stream, so method
+        try {   // Note that we cannot use try with resources because we export the method stream, so method
             // must not be closed.
             method = HTTPFactory.Get(methodurl);
             if(allowCompression)
-                method.setRequestHeader("Accept-Encoding", "deflate,gzip");
+                method.setCompression("deflate,gzip");
 
             this.status = method.execute();
 

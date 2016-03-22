@@ -176,20 +176,19 @@ class ThreddsScalarLayer extends AbstractScalarLayer implements ThreddsLayer {
       throw new IOException(e);
     }
     return horizontalPoints;
-
   }
     
-
-    /*public List<Float> readHorizonalPoints(DateTime time, double elevation, Domain<HorizontalPosition> domain)
-            throws InvalidDimensionValueException, IOException
-    {
-        int tIndex = this.findAndCheckTimeIndex(time);
-        int zIndex = this.findAndCheckElevationIndex(elevation);
-        Domain<HorizontalPosition> targetDomain = domain;
-        HorizontalGrid hg = CdmUtils.createHorizontalGrid(grid.getCoordinateSystem());
-        PixelMap pixelMap = new PixelMap(hg, targetDomain);
-        return CdmUtils.readHorizontalPoints(null, grid,  tIndex, zIndex, pixelMap, this.dataReadingStrategy, (int)targetDomain.size());
-    }*/
+  @Override
+  public List<Float> readTimeseries(List<DateTime> times, double elevation, HorizontalPosition xy)
+      throws InvalidDimensionValueException, IOException
+  {
+      HorizontalGrid horizGrid = CdmUtils.createHorizontalGrid(grid.getCoordinateSystem());
+      List<Integer> tIndices = new ArrayList<Integer>(times.size());
+      for (DateTime time : times)
+          tIndices.add(this.findAndCheckTimeIndex(time));
+      int zIndex = this.findAndCheckElevationIndex(elevation);
+      return CdmUtils.readTimeseries(null, grid, horizGrid, tIndices, zIndex, xy);
+  }
 
   public String getStandardName() {
     if (this.grid == null) return null;

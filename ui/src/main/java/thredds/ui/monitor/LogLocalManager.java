@@ -120,7 +120,9 @@ public class LogLocalManager {
     for (File f : files) {
       if (f.isDirectory()) continue;
       if (f.getName().endsWith(".zip")) continue;
-      list.add(new FileDateRange(f));
+      FileDateRange fdr = new FileDateRange(f);
+      if (!fdr.bad)
+        list.add(fdr);
     }
     Collections.sort(list, new ServletFileCompare());
 
@@ -195,11 +197,17 @@ public class LogLocalManager {
   public class FileDateRange {
     File f;
     Date start, end;
+    boolean bad;
 
     FileDateRange(File f) {
       this.f = f;
       this.start = extractStartDate(f.getName());
-      System.out.printf(" %s == %s%n", f.getName(), df.toDateTimeStringISO(start));
+      if (this.start == null) {
+        bad = true;
+        System.out.printf(" %s == BAD FILE%n", f.getName());
+      } else {
+        System.out.printf(" %s == %s%n", f.getName(), df.toDateTimeStringISO(start));
+      }
     }
 
     Date extractStartDate(String name) {
@@ -214,11 +222,12 @@ public class LogLocalManager {
           String filenameDate;
           int len = name.length();
 
-          // all: access.2013-07-29.log
+          // all: access.2013-07-29.log  or  localhost_access_log.2015-06-17.txt
           // 4.3: threddsServlet.log.2013-08-01-14
           // 4.4: threddsServlet.2013-08-01-14.log
-          if (name.startsWith("access.")) {
-            filenameDate = name.substring("access.".length(), len - 4);
+          if (name.contains("access")) {
+            int pos = name.indexOf(".");
+            filenameDate = name.substring(pos+1, len - 4);
           } else if (name.startsWith("threddsServlet.log.")) {
             filenameDate = name.substring("threddsServlet.log.".length());
           } else if (name.startsWith("threddsServlet.")) {

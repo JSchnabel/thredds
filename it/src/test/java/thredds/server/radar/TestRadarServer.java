@@ -1,24 +1,27 @@
 package thredds.server.radar;
 
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import thredds.TestWithLocalServer;
 import thredds.util.HttpUriResolver;
 import thredds.util.HttpUriResolverFactory;
 import ucar.nc2.util.IO;
+import ucar.unidata.test.util.NeedsCdmUnitTest;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Arrays;
 
-import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 @RunWith(Parameterized.class)
+@Category(NeedsCdmUnitTest.class)
 public class TestRadarServer {
 
-  @Parameterized.Parameters
+  @Parameterized.Parameters(name="{0}")
   public static java.util.Collection<Object[]> getTestParameters() {
     return Arrays.asList(new Object[][]{
             {"/radar/radarCollections.xml"},
@@ -33,7 +36,7 @@ public class TestRadarServer {
   String xmlEncoding = "application/xml;charset=UTF-8";
   String path;
   public TestRadarServer(String path) {
-    this.path = TestWithLocalServer.server + path;
+    this.path = TestWithLocalServer.withPath(path);
   }
 
   @org.junit.Test

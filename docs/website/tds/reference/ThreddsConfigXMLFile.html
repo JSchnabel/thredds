@@ -33,6 +33,7 @@
       <li><a href="#catalogRoots">Extra Root Catalogs</a></li>
       <li><a href="#Viewers">Adding a Viewer</a></li>
       <li><a href="#DatasetSource">Adding a Dataset Source</a></li>
+      <li><a href="#LogVersionInfo">Checking for updates</a></li>
     </ul>
   </li>
   <li>Controlling Data Services</li>
@@ -56,13 +57,15 @@
   <li>Disk Caching
     <ul>
       <li><a href="#DiskCache">CDM Disk cache</a></li>
-      <li><a href="#AggregationCache">Aggregation Cache </a></li>
+      <li><a href="#AggregationCache">Aggregation Cache</a></li>
+      <li><a href="#FeatureCollectionCache">FMRC cache</a></li>
       <li><a href="#GribIndexWriting">Grib Index redirection</a></li>
     </ul>
   </li>
   <li>Object caching
     <ul>
-      <li><a href="#FileCache">NetcdfFile Object and File Handle Caching</a></li>
+      <li><a href="#RafCache">File Handles</a></li>
+      <li><a href="#FileCache">NetcdfFile Object </a></li>
     </ul>
   </li>
   <ul>
@@ -193,6 +196,23 @@ where:
 <p>You can add a <em><strong>DataSource</strong></em> - essentially an IOSP with access to Servlet request parameters, by loading a
   <a href="DatasetSource.html">dataset source</a> at runtime.</p>
 <hr>
+
+<h3><a name="LogVersionInfo">Checking for Updates</a></h3>
+<pre>
+&lt;TdsUpdateConfig&gt;
+  &lt;logVersionInfo&gt;true&lt;/logVersionInfo&gt;
+&lt;/TdsUpdateConfig&gt;
+</pre>
+<p>The <em><strong>TdsUpdateConfig</strong></em> element controls if the TDS checks
+  with Unidata regarding possible updates. The default (<i>true</i>) is for the TDS
+  to check for the current stable and development release versions, and to log that
+  information in the TDS <em><strong>serverStartup.log</strong></em> file as INFO
+  entries. If you do not want the TDS to check for this on startup, set this to
+  <i>false</i>.
+</p>
+
+<hr>
+
 <h2>Controlling Data Services</h2>
 
 <h3><a name="Remote">Remote Catalog Service for Catalogs</a></h3>
@@ -258,7 +278,7 @@ where:
     before being sent to the client (see <a href="#Cache_Locations">choosing a cache directory</a>). If not otherwise set, the TDS will use the <strong>${tomcat_home}/content/thredds/cache/wcs/</strong> directory. We recommend that you do not specify a <strong>WCS.dir</strong> element, and use the default.</li>
   <li><strong>scour</strong>: how often to scour the working directory, to delete files that were not successfully downloaded.</li>
   <li><strong>maxAge</strong>: how long to leave the files in the working directory while
-    the download is occurring. The files are deleted after a successful download.</li>
+    the download is occurring. The files are deleted after a successful download. Do not set to &lt;= 0.</li>
 </ol>
 <h3><a name="WMS" id="WMS">WMS Service</a></h3>
 
@@ -333,8 +353,8 @@ where:
   <li><strong>maxAge</strong>:
     how long to leave the files in the working directory while the download
     is occurring. The files are deleted after a successful download.
-  </li>
-  <li><strong>maxFileDownloadSize (version 4.3)</strong>: maximum size of file that can be requested. Optional; default is that there is no size limitation. If
+  Do not set to &lt;= 0.</li>
+  <li><strong>maxFileDownloadSize</strong>: maximum size of file that can be requested. Optional; default is that there is no size limitation. If
     the file is &gt; 2 GB, large format netCDF will be written.
   </li>
 </ol>
@@ -400,8 +420,9 @@ where:
   &lt;typicalDataset&gt;penultimate&lt;/typicalDataset&gt;
 &lt;/Aggregation&gt;
 </pre>
-<p>You can control how NcML Aggregation chooses its typical / template dataset, the one it uses to populate the metadata for the resulting aggregated dataset. Valid values are <strong>first, random, latest</strong> and <strong>penultimate</strong> (latest but one). The default
-  is <strong>penultimate</strong>.</p>
+<p>You can control how NcML Aggregation chooses its typical/template dataset &mdash; the one it uses to populate the
+  metadata for the resulting aggregated dataset. Valid values are <strong>first, random, latest</strong>, and
+  <strong>penultimate</strong> (latest but one). The default is <strong>penultimate</strong>.</p>
 <p></p>
 <hr>
 <h2><a name="Cache_Locations">Disk Caching and temporary files</a></h2>
@@ -508,9 +529,10 @@ ln -s /data/thredds/content content</pre>
 <p><em>since version 4.1</em></p>
 <pre>
 &lt;AggregationCache&gt;
-  &lt;dir&gt;/temp/acache/&lt;/dir&gt;
+  &lt;dir&gt;/tomcat_home/content/thredds/cache/agg/&lt;/dir&gt;
   &lt;scour&gt;24 hours&lt;/scour&gt;
   &lt;maxAge&gt;90 days&lt;/maxAge&gt;
+  &lt;cachePathPolicy&gt;nestedDirectory&lt;/cachePathPolicy&gt;
 &lt;/AggregationCache&gt;
 </pre>
 <p> If you have <strong>joinExisting</strong> Aggregations, coordinate information will be written to a cache directory specified by <strong>dir</strong>
@@ -522,6 +544,12 @@ ln -s /data/thredds/content content</pre>
   have aggregations that never change, set <strong>scour</strong> to &quot;-1&quot; to disable the operation. Otherwise, make <strong>maxAge</strong> longer than the longest time between changes. Basically, you don't want to remove
   active aggregations.</p>
 
+<p><strong>cachePathPolicy</strong> controls <em>how</em> cache files are stored in <strong>dir</strong>. It must be
+  set to one of <code>oneDirectory</code> or <code>nestedDirectory</code> (the default).
+  <code>oneDirectory</code> will put all cache files into the same directory, while
+  <code>nestedDirectory</code> will preserve their directory structure. Use <code>nestedDirectory</code>
+  for large aggregations, as some file systems struggle when a directory contains thousands of files.</p>
+
 <p>This cache information is intended to be permanent; it stores coordinate
   information from each file in the aggregation, so that the file does
   not have to be opened each time the dataset is opened. If you have
@@ -529,6 +557,17 @@ ln -s /data/thredds/content content</pre>
   pronounced difference with and without this cache. </p>
 
 <p>The cache information is updated based on the <strong>recheckEvery</strong> field in the <strong>joinExisting</strong> aggregation element.</p>
+<h3>FeatureCollection cache<a name="FeatureCollectionCache"></a></h3>
+<p><em>since version 4.2</em></p>
+<p>This is where persistent information is kept about FMRCs, in order to speed them up. We recommend that you use the default settings, by not specifying this option.</p>
+<pre> &lt;FeatureCollection&gt;<br>   &lt;<strong>dir</strong>&gt;/tomcat_home/content/thredds/cache/collection/&lt;/<strong>dir</strong>&gt;
+   &lt;<strong>maxSize</strong>&gt;20 Mb&lt;/<strong>maxSize</strong>&gt;
+   &lt;<strong>jvmPercent</strong>&gt;2&lt;/<strong>jvmPercent</strong>&gt;<br> &lt;/FeatureCollection&gt;</pre>
+<ol>
+  <li><strong>dir</strong>: location of Feature Collection cache, currently implemented with&nbsp;<a href="http://www.oracle.com/technetwork/database/berkeleydb/overview/index-093405.html">Berkeley DB</a>. If not otherwise set, the TDS will use the<strong>${tomcat_home}/content/thredds/cache/collection/</strong>&nbsp;directory We recommend that you use this default, by not specifying a&nbsp;<strong>FeatureCollection</strong>.<strong>dir</strong>&nbsp;element.</li>
+  <li><strong>maxSize</strong>: maximum amount of memory to be used for this cache.</li>
+  <li><strong>jvmPercent</strong>: alternately, set the memory use as a percent of JVM memory, ie -Xmx value.&nbsp;<strong>maxSize</strong>&nbsp;will override if present. Default is 2 %.</li>
+</ol>
 <h3><a name="GribIndexWriting" id="GribIndexWriting">GRIB Index redirection</a></h3>
 
 <p><em>since version 4.3.15</em></p>
@@ -557,7 +596,7 @@ ln -s /data/thredds/content content</pre>
   <li>
     <p>The policy must be set to one of <em>oneDirectory</em> or <em>nestedDirectory </em> (the default). <em>oneDirectory</em> will put all index files into the
       same directory, while <em>nestedDirectory</em> will preserve the directory structure of the index files. Use <em>nestedDirectory</em> for large
-      collections of  files.</p>
+      collections of files, as some file systems struggle when a directory contains thousands of files.</p>
   </li>
   <li>Every <strong>scour</strong> amount of time, any files in the cache that are older than <strong>maxAge</strong> will be removed. To turn off scouring, set the scour time to 0 (eg &quot;0 hours&quot;), or leave out the &lt;scour&gt; element. Typically you do <strong>not</strong> want to scour the indices.</li>
 </ol>
@@ -569,46 +608,38 @@ ln -s /data/thredds/content content</pre>
 <p>A good rule of thumb is that the index files will need disk space between 500 and 1000 times smaller than the size of the grib data files. So a 1 Terabyte collection of GRIB data will need up to 2 GB of indices.</p>
 <hr style="width: 100%; height: 2px;">
 <h2>Object Caching</h2>
-
-<h3><a name="FileCache">NetcdfFile Object and File Handle Caching</a></h3>
+<p>The default settings will work well enough, and you should only tune them if you have performance problems, and are able to monitor their effect.</p>
+<h2></h2>
+<h3><a name="RafCache" id="RafCache">File Handle Caching</a></h3>
+<pre>
+&lt;RandomAccessFile&gt;
+  &lt;minFiles&gt;400&lt;/minFiles&gt;
+  &lt;maxFiles&gt;500&lt;/maxFiles&gt;
+  &lt;scour&gt;11 min&lt;/scour&gt;
+&lt;/RandomAccessFile&gt;
+</pre>
+<p>There is  a pool of shared <strong>RandomAccessFile </strong>objects, each of which  stores an open OS file handle. Since each OS has a maximum on the number of open file handles per process, you must make sure that the
+sum of the maxFiles does not exceed your OS maximum. For better performance, make these numbers as high as possible.</p>
+<h3><a name="FileCache">NetcdfFile Objects</a></h3>
 
 <pre>
 &lt;NetcdfFileCache&gt;
-  &lt;minFiles&gt;50&lt;/minFiles&gt;
-  &lt;maxFiles&gt;100&lt;/maxFiles&gt;
-  &lt;scour&gt;11 min&lt;/scour&gt;
+  &lt;minFiles&gt;100&lt;/minFiles&gt;
+  &lt;maxFiles&gt;150&lt;/maxFiles&gt;
+  &lt;scour&gt;12 min&lt;/scour&gt;
 &lt;/NetcdfFileCache&gt;
 </pre>
 <pre>
-&lt;HTTPFileCache&gt;
-  &lt;minFiles&gt;10&lt;/minFiles&gt;
-  &lt;maxFiles&gt;20&lt;/maxFiles&gt;
-  &lt;scour&gt;17 min&lt;/scour&gt;
-&lt;/HTTPFileCache&gt;
-</pre>
-<pre>
-&lt;GribCollection&gt;
-  &lt;minFiles&gt;50&lt;/minFiles&gt;
-  &lt;maxFiles&gt;100&lt;/maxFiles&gt;
-  &lt;scour&gt;13 min&lt;/scour&gt;
-&lt;/GribCollection&gt;
-</pre>
-<pre>
 &lt;TimePartition&gt;
-  &lt;minFiles&gt;50&lt;/minFiles&gt;
-  &lt;maxFiles&gt;100&lt;/maxFiles&gt;
-  &lt;scour&gt;12 min&lt;/scour&gt;
+  &lt;minFiles&gt;100&lt;/minFiles&gt;
+  &lt;maxFiles&gt;150&lt;/maxFiles&gt;
+  &lt;scour&gt;13 min&lt;/scour&gt;
 &lt;/TimePartition&gt;
 </pre>
-<p>These elements control the size of the TDS cache for objects/open file handles for 1) <strong>NetcdfFile</strong> objects, 2) files served through <strong>HTTP
-  Range-Byte</strong> requests, 3) <strong>GribCollection</strong> data files, and 4) <strong>Grib Collection partition</strong> files, respectively. Up to <strong>maxFiles</strong> objects will be cached, and every
+<p>These elements control the size of the TDS cache for objects for 1) <strong>NetcdfFile</strong> objects, and 2) <strong>Grib Partition </strong> files, respectively. Up to <strong>maxFiles</strong> objects will be cached, and every
   <strong>scour</strong> amount of time, older items in the cache will be released, until only <strong>minFiles</strong> objects are left. The
   <strong>scour</strong> element uses any valid <strong><em>udunits</em></strong> time string, such as <em><strong>sec, min, hour, day</strong></em>. To disable
-  the cache, set <strong>maxFiles</strong> to 0. </p>
-
-<p>Each of these Objects stores an open OS file handle. Since each OS has a maximum on the number of open file handles per process, you must make sure that the
-  sum of the maxFiles does not exceed your OS maximum. A typical limit is 1024, so the defaults above are well below that limit. </p>
-
+  the cache, set <strong>maxFiles</strong> to 0.</p>
 <h3><a name="CatalogCaching" id="CatalogCaching">Static Catalog Caching</a></h3>
 
 <p><em>since version 4.2.8</em></p>
@@ -705,7 +736,7 @@ ln -s /data/thredds/content content</pre>
 <hr width="100%">
 <address>
   <img alt="THREDDS" src="../thread.png" height="108" width="110">
-  This document is maintained by elves and was last updated Oct 2014.
+  This document is maintained by elves and was last updated April 2015.
   Send comments to
 <a href="mailto:support-thredds@unidata.ucar.edu">THREDDS support</a>.
 </address>

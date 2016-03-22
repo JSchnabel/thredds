@@ -33,12 +33,19 @@
 
 package ucar.nc2.iosp;
 
-import org.junit.Test;
+import org.junit.*;
+import org.junit.experimental.categories.Category;
 import ucar.ma2.Array;
 import ucar.ma2.DataType;
 import ucar.ma2.InvalidRangeException;
+import ucar.nc2.Attribute;
 import ucar.nc2.NetcdfFile;
 import ucar.nc2.Variable;
+import ucar.nc2.constants.CDM;
+import ucar.nc2.util.Misc;
+import ucar.nc2.util.cache.FileCache;
+import ucar.unidata.io.RandomAccessFile;
+import ucar.unidata.test.util.NeedsCdmUnitTest;
 import ucar.unidata.test.util.TestDir;
 
 import java.io.IOException;
@@ -50,17 +57,28 @@ import java.util.Arrays;
  * @author caron
  * @since 7/29/2014
  */
+@Category(NeedsCdmUnitTest.class)
 public class TestMiscIosp {
+  private static int leaks;
+
+  @BeforeClass
+  static public void startup() {
+    RandomAccessFile.setDebugLeaks(true);
+    RandomAccessFile.enableDefaultGlobalFileCache();
+    leaks =  RandomAccessFile.getOpenFiles().size();
+  }
+
+  @AfterClass
+  static public void checkLeaks() {
+    FileCache.shutdown();
+    RandomAccessFile.setGlobalFileCache(null);
+    assert leaks == TestDir.checkLeaks();
+    RandomAccessFile.setDebugLeaks(false);
+  }
 
   @Test
   public void testFyiosp() throws IOException {
-     //String fileIn = "/home/yuanho/dev/netcdf-java-2.2/src/ucar/nc2/n0r_20040823_2215";    // uncompressed
-     // String fileIn = "c:/data/image/gini/n0r_20041013_1852";
-
      String fileIn =  TestDir.cdmUnitTestDir + "formats/fysat/SATE_L3_F2C_VISSR_MWB_SNO_CNB-DAY-2008010115.AWX";
-
-     //String fileIn = "E:/SATE_L3_F2C_VISSR_MWB_SNO_CNB/200801/SATE_L3_F2C_VISSR_MWB_SNO_CNB-DAY-2008010815.AWX";
-     //ucar.nc2.NetcdfFile.registerIOProvider(ucar.nc2.iosp.fysat.Fysatiosp.class);
      try (ucar.nc2.NetcdfFile ncf = ucar.nc2.NetcdfFile.open(fileIn)) {
        System.out.printf("open %s %n", ncf.getLocation());
 
@@ -103,6 +121,65 @@ public class TestMiscIosp {
 
       Array data = v.read();
       assert Arrays.equals(data.getShape(), new int[]{1, 3000, 4736});
+    }
+  }
+
+
+  @Test
+  public void testGrads() throws IOException, InvalidRangeException {
+    String fileIn = TestDir.cdmUnitTestDir + "formats/grads/mask.ctl";
+    try (ucar.nc2.NetcdfFile ncf = ucar.nc2.NetcdfFile.open(fileIn)) {
+      System.out.printf("open %s %n", ncf.getLocation());
+
+      ucar.nc2.Variable v = ncf.findVariable("mask");
+      assert v != null;
+      assert v.getDataType() == DataType.FLOAT;
+      Attribute att = v.findAttribute(CDM.MISSING_VALUE);
+      assert att != null;
+      assert att.getDataType() == DataType.FLOAT;
+      assert Misc.closeEnough(att.getNumericValue().floatValue(), -9999.0f);
+
+      Array data = v.read();
+      assert Arrays.equals(data.getShape(), new int[]{1, 1, 180, 360});
+    }
+  }
+
+  @Test
+  public void testGradsWithRAFCache() throws IOException, InvalidRangeException {
+    String fileIn = TestDir.cdmUnitTestDir + "formats/grads/mask.ctl";
+    try (ucar.nc2.NetcdfFile ncf = ucar.nc2.NetcdfFile.open(fileIn)) {
+      System.out.printf("open %s %n", ncf.getLocation());
+
+      ucar.nc2.Variable v = ncf.findVariable("mask");
+      assert v != null;
+      assert v.getDataType() == DataType.FLOAT;
+      Attribute att = v.findAttribute(CDM.MISSING_VALUE);
+      assert att != null;
+      assert att.getDataType() == DataType.FLOAT;
+      assert Misc.closeEnough(att.getNumericValue().floatValue(), -9999.0f);
+
+      Array data = v.read();
+      assert Arrays.equals(data.getShape(), new int[]{1, 1, 180, 360});
+    }
+  }
+
+  // @Test
+  // dunno what kind of grads file this is.
+  public void testGrads2() throws IOException, InvalidRangeException {
+    String fileIn = TestDir.cdmUnitTestDir + "formats/grads/pdef.ctl";
+    try (ucar.nc2.NetcdfFile ncf = ucar.nc2.NetcdfFile.open(fileIn)) {
+      System.out.printf("open %s %n", ncf.getLocation());
+
+      ucar.nc2.Variable v = ncf.findVariable("pdef");
+      assert v != null;
+      assert v.getDataType() == DataType.FLOAT;
+      Attribute att = v.findAttribute(CDM.MISSING_VALUE);
+      assert att != null;
+      assert att.getDataType() == DataType.FLOAT;
+      assert Misc.closeEnough(att.getNumericValue().floatValue(), -9999.0f);
+
+      Array data = v.read();
+      assert Arrays.equals(data.getShape(), new int[]{1, 1, 180, 360});
     }
   }
 

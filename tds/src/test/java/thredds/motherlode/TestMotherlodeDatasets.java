@@ -32,43 +32,48 @@
  */
 package thredds.motherlode;
 
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Formatter;
+
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import thredds.client.catalog.Catalog;
 import thredds.client.catalog.CatalogRef;
 import thredds.client.catalog.Dataset;
 import thredds.client.catalog.ThreddsMetadata;
-import thredds.client.catalog.builder.CatalogBuilder;
 import thredds.client.catalog.writer.CatalogCrawler;
 import thredds.client.catalog.writer.DataFactory;
+import ucar.httpservices.HTTPSession;
 import ucar.nc2.Group;
 import ucar.nc2.NetcdfFile;
+import ucar.nc2.constants.FeatureType;
+import ucar.nc2.dataset.NetcdfDataset;
 import ucar.nc2.dt.GridDatatype;
 import ucar.nc2.dt.grid.GridDataset;
-import ucar.nc2.dataset.NetcdfDataset;
-
-import java.io.*;
-import java.util.*;
-
 import ucar.nc2.util.CompareNetcdf2;
-import ucar.httpservices.HTTPSession;
+import ucar.unidata.test.util.NeedsExternalResource;
+import ucar.unidata.test.util.TestDir;
 
 /**
  * Run through the named catalogs, open a random dataset from each collection
  */
 @RunWith(Parameterized.class)
+@Category(NeedsExternalResource.class)
 public class TestMotherlodeDatasets implements CatalogCrawler.Listener {
-  public static String server = "http://thredds-dev.ucar.edu/thredds";
+  public static String server = "http://"+TestDir.threddsTestServer+"/thredds";
 
-  @Parameterized.Parameters
- 	public static Collection<Object[]> getTestParameters(){
+  @Parameterized.Parameters(name="{0}")
+ 	public static Collection<Object[]> getTestParameters() {
  		return Arrays.asList(new Object[][]{
-            {"/idd/modelsNcep.xml", CatalogCrawler.Type.random_direct, false},
-            {"/idd/modelsFnmoc.xml", CatalogCrawler.Type.random_direct, false},
-            {"/modelsHrrr.xml", CatalogCrawler.Type.random_direct, false},
-            {"/testDatasets.xml", CatalogCrawler.Type.random_direct, false},
+            {"/catalog/grib/NCEP/WW3/Global/catalog.xml", CatalogCrawler.Type.random_direct, false},
+           // {"/idd/modelsFnmoc.xml", CatalogCrawler.Type.random_direct, false},
+           // {"/modelsHrrr.xml", CatalogCrawler.Type.random_direct, false},
+           // {"/testDatasets.xml", CatalogCrawler.Type.random_direct, false},
     });
  	}
 
@@ -99,79 +104,66 @@ public class TestMotherlodeDatasets implements CatalogCrawler.Listener {
   }
 
   private class FilterDataset implements CatalogCrawler.Filter {
-
     @Override
     public boolean skipAll(Dataset ds) {
-      if (skipDatasetScan && (ds instanceof CatalogRef) && ds.findProperty("DatasetScan") != null) return true;
-      return false;
+      return skipDatasetScan && (ds instanceof CatalogRef) && ds.findProperty("DatasetScan") != null;
     }
   }
 
   @Test
   public void crawl() throws IOException {
     out.println("Read " + catUrl);
-
-    CatalogBuilder catFactory = new CatalogBuilder();
-    Catalog cat = catFactory.buildFromLocation(catUrl);
-    boolean isValid = !catFactory.hasFatalError();
-
-    if (!isValid) {
-      System.out.println("***Catalog invalid= " + catUrl + " validation output=\n" + catFactory.getErrorMessage());
-      out.println("***Catalog invalid= " + catUrl + " validation output=\n" + catFactory.getErrorMessage());
-      return;
-    }
-    out.println("catalog <" + cat.getName() + "> is valid");
-    out.println(" validation output=\n" + catFactory.getErrorMessage());
-
     countDatasets = 0;
     countNoAccess = 0;
     countNoOpen = 0;
     int countCatRefs = 0;
-    CatalogCrawler crawler = new CatalogCrawler(type, new FilterDataset(), this);
+    CatalogCrawler crawler = new CatalogCrawler(type, 0, new FilterDataset(), this);
     long start = System.currentTimeMillis();
     try {
-      countCatRefs = crawler.crawl(cat, null, verbose ? out : null, null);
+      countCatRefs = crawler.crawl(catUrl, null, verbose ? out : null, null);
 
     } finally {
       int took = (int) (System.currentTimeMillis() - start) / 1000;
 
       out.println("***Done " + catUrl + " took = " + took + " secs\n" +
               "   datasets=" + countDatasets + " no access=" + countNoAccess + " open failed=" + countNoOpen + " total catalogs=" + countCatRefs);
-
+      out.close();
     }
 
-    assert countNoAccess == 0;
     assert countNoOpen == 0;
+    assert crawler.getNumReadFailures() == 0 :
+            String.format("Failed to read %s catalogs.", crawler.getNumReadFailures());
   }
 
   @Override
   public void getDataset(Dataset ds, Object context) {
     countDatasets++;
 
-    ThreddsMetadata.GeospatialCoverage gc = ds.getGeospatialCoverage();
-    if (gc == null)
-      out.printf("   GeospatialCoverage NULL id = %s%n", ds.getId());
-
-    NetcdfDataset ncd = null;
+    // Formatter log = new Formatter();
     try {
-      Formatter log = new Formatter();
-      ncd = tdataFactory.openDataset(ds, false, null, log);
+      DataFactory.Result threddsData = tdataFactory.openFeatureDataset(ds, null);
 
-      if (ncd == null) {
-        out.printf("**** failed= %s err=%s%n", ds.getName(), log);
+    // try (NetcdfDataset ncd = tdataFactory.openDataset(ds, false, null, log)) {
+
+      if (threddsData.fatalError) {
+        out.printf("**** failed= %s err=%s%n", ds.getName(), threddsData.errLog);
         countNoAccess++;
 
-      } else {
-        GridDataset gds = new GridDataset(ncd);
+      } else if (threddsData.featureType == FeatureType.GRID) {
+        GridDataset gds = (GridDataset) threddsData.featureDataset;
         java.util.List<GridDatatype> grids =  gds.getGrids();
         int n = grids.size();
         if (n == 0)
           out.printf("  # Grids == 0 id = %s%n", ds.getId());
         else if (verbose)
-          out.printf("   %d %s OK%n", n, gds.getLocationURI());
+          out.printf("     OK ngrids=%d %s%n", n, gds.getLocationURI());
+
+        ThreddsMetadata.GeospatialCoverage gc = ds.getGeospatialCoverage();
+        if (gc == null)
+          out.printf("   GeospatialCoverage NULL id = %s%n", ds.getId());
 
         if (compareCdm)
-          compareCdm(ds, ncd);
+          compareCdm(ds, gds.getNetcdfDataset());
 
         if (checkUnknown) {
           for (GridDatatype vs : grids) {
@@ -195,11 +187,6 @@ public class TestMotherlodeDatasets implements CatalogCrawler.Listener {
       e.printStackTrace();
       
       countNoOpen++;
-    } finally {
-      if (ncd != null) try {
-        ncd.close();
-      } catch (IOException e) {
-      }
     }
 
   }

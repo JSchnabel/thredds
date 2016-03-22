@@ -58,9 +58,13 @@ public class DataFactory {
   static public final String PROTOCOL = "thredds";
   static public final String SCHEME = PROTOCOL + ":";
 
-  static private boolean preferCdm = true;
+  static private ServiceType[] preferAccess;
+
   static public void setPreferCdm(boolean prefer) {
-    preferCdm = prefer;
+    preferAccess = prefer ? new ServiceType[] {ServiceType.CdmRemote} : null;
+  }
+  static public void setPreferAccess(ServiceType... prefer) {
+    preferAccess = prefer;
   }
 
   static public void setDebugFlags(ucar.nc2.util.DebugFlags debugFlag) {
@@ -344,17 +348,17 @@ public class DataFactory {
     return (result.fatalError) ? null : ncd;
   }
 
-  private NetcdfDataset openDataset(Dataset Dataset, boolean acquire, ucar.nc2.util.CancelTask task, Result result) throws IOException {
+  private NetcdfDataset openDataset(Dataset dataset, boolean acquire, ucar.nc2.util.CancelTask task, Result result) throws IOException {
 
     IOException saveException = null;
 
-    List<Access> accessList = new ArrayList<>(Dataset.getAccess()); // a list of all the accesses
+    List<Access> accessList = new ArrayList<>(dataset.getAccess()); // a list of all the accesses
     while (accessList.size() > 0) {
       Access access = chooseDatasetAccess(accessList);
 
       // no valid access
       if (access == null) {
-        result.errLog.format("No access that could be used in dataset %s %n", Dataset);
+        result.errLog.format("No access that could be used in dataset %s %n", dataset);
         if (saveException != null)
           throw saveException;
         return null;
@@ -376,7 +380,7 @@ public class DataFactory {
       // ready to open it through netcdf API
       NetcdfDataset ds;
 
-// try to open
+      // try to open
       try {
         ds = openDataset(access, acquire, task, result);
 
@@ -396,7 +400,7 @@ public class DataFactory {
       return ds;
     } // loop over accesses
 
-    if (saveException != null) throw saveException;
+    // if (saveException != null) throw saveException;
     return null;
   }
 
@@ -460,9 +464,9 @@ public class DataFactory {
       ncd = acquire ? NetcdfDataset.acquireDataset(curl, enhanceMode, task) : NetcdfDataset.openDataset(curl, enhanceMode, task);
     }
 
-    // open CdmRemote
+    // open HTTPServer
     else if (serviceType == ServiceType.HTTPServer) {
-      String curl =  (datasetLocation.startsWith("http:")) ? "nodods:" + datasetLocation.substring(5) : datasetLocation;
+      String curl =  (datasetLocation.startsWith("http:")) ? "httpserver:" + datasetLocation.substring(5) : datasetLocation;
       ncd = acquire ? NetcdfDataset.acquireDataset(curl, enhanceMode, task) : NetcdfDataset.openDataset(curl, enhanceMode, task);
     }
 
@@ -497,8 +501,17 @@ public class DataFactory {
     if (accessList.size() == 0)
       return null;
 
+    Access access = null;
+    if (preferAccess != null) {
+      for (ServiceType type : preferAccess) {
+        access = findAccessByServiceType(accessList, type);
+        if (access != null) break;
+      }
+    }
+
     // the order indicates preference
-    Access access = findAccessByServiceType(accessList, ServiceType.CdmRemote);
+    if (access == null)
+      access = findAccessByServiceType(accessList, ServiceType.CdmRemote);
     if (access == null)
       access = findAccessByServiceType(accessList, ServiceType.DODS);
     if (access == null)
@@ -507,8 +520,10 @@ public class DataFactory {
        access = findAccessByServiceType(accessList, ServiceType.DAP4);
     if (access == null)
       access = findAccessByServiceType(accessList, ServiceType.File); // should mean that it can be opened through netcdf API
+    if (access == null)
+      access = findAccessByServiceType(accessList, ServiceType.HTTPServer); // should mean that it can be opened through netcdf API
 
-    // look for HTTP with format we can read
+    /* look for HTTP with format we can read
     if (access == null) {
       Access tryAccess = findAccessByServiceType(accessList, ServiceType.HTTPServer);
 
@@ -516,14 +531,14 @@ public class DataFactory {
         DataFormatType format = tryAccess.getDataFormatType();
 
         // these are the file types we can read
-        if ((DataFormatType.BUFR == format) || (DataFormatType.GINI == format) || (DataFormatType.GRIB1 == format)
-                || (DataFormatType.GRIB2 == format) || (DataFormatType.HDF5 == format) || (DataFormatType.NCML == format)
-                || (DataFormatType.NETCDF == format) || (DataFormatType.NETCDH == format) || (DataFormatType.NEXRAD2 == format) 
-                || (DataFormatType.NIDS == format)) {
+        if ((DataFormatType.NCML == format) || (DataFormatType.NETCDF == format)) {   // removed 4/4/2015 jc
+        //if ((DataFormatType.BUFR == format) || (DataFormatType.GINI == format) || (DataFormatType.GRIB1 == format)
+        //        || (DataFormatType.GRIB2 == format) || (DataFormatType.HDF5 == format) || (DataFormatType.NETCDH == format) || (DataFormatType.NCML == format)
+       //         || (DataFormatType.NETCDF == format) || (DataFormatType.NEXRAD2 == format) || (DataFormatType.NIDS == format)) {
           access = tryAccess;
         }
       }
-    }
+    } */
 
     // ADDE
     if (access == null)
@@ -653,7 +668,8 @@ public class DataFactory {
 
   private Access findAccessByServiceType(List<Access> accessList, ServiceType type) {
     for (Access a : accessList) {
-      if (type.toString().equalsIgnoreCase(a.getService().getType().toString()))
+      ServiceType stype = a.getService().getType();
+      if (stype != null && stype.toString().equalsIgnoreCase(type.toString()))
         return a;
     }
     return null;
@@ -663,7 +679,8 @@ public class DataFactory {
 
   private Access findAccessByDataFormatType(List<Access> accessList, DataFormatType type) {
     for (Access a : accessList) {
-      if (type.toString().equalsIgnoreCase(a.getDataFormatType().toString()))
+      DataFormatType has = a.getDataFormatType();
+      if (has != null && type.toString().equalsIgnoreCase(has.toString()))
         return a;
     }
     return null;

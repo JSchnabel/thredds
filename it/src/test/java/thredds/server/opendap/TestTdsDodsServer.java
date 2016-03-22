@@ -32,9 +32,6 @@
  */
 package thredds.server.opendap;
 
-import java.io.IOException;
-import java.util.List;
-
 import com.eclipsesource.restfuse.Destination;
 import com.eclipsesource.restfuse.HttpJUnitRunner;
 import com.eclipsesource.restfuse.Method;
@@ -43,6 +40,7 @@ import com.eclipsesource.restfuse.annotation.Context;
 import com.eclipsesource.restfuse.annotation.HttpTest;
 import org.junit.Rule;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import thredds.TestWithLocalServer;
 import thredds.client.catalog.Catalog;
@@ -58,13 +56,18 @@ import ucar.nc2.dataset.NetcdfDataset;
 import ucar.nc2.dt.GridCoordSystem;
 import ucar.nc2.dt.GridDataset;
 import ucar.nc2.dt.GridDatatype;
+import ucar.unidata.test.util.NeedsCdmUnitTest;
 import ucar.unidata.test.util.TestDir;
 import ucar.unidata.util.StringUtil2;
+
+import java.io.IOException;
+import java.util.List;
 
 import static com.eclipsesource.restfuse.Assert.assertBadRequest;
 import static com.eclipsesource.restfuse.Assert.assertOk;
 
 @RunWith(HttpJUnitRunner.class)
+@Category(NeedsCdmUnitTest.class)
 public class TestTdsDodsServer {
   private static URLEncoder encoder = new URLEncoder();
 
@@ -90,8 +93,8 @@ public class TestTdsDodsServer {
 
   @Test
   public void testUrlReading() throws IOException {
-    doOne(TestWithLocalServer.server+"dodsC/scanCdmUnitTests/tds/ncep/NAM_Alaska_22km_20100504_0000.grib1");
-    doOne(TestWithLocalServer.server+"dodsC/scanCdmUnitTests/tds/ncep/NAM_Alaska_45km_conduit_20100913_0000.grib2");
+    doOne(TestWithLocalServer.withPath("dodsC/scanCdmUnitTests/tds/ncep/NAM_Alaska_22km_20100504_0000.grib1"));
+    doOne(TestWithLocalServer.withPath("dodsC/scanCdmUnitTests/tds/ncep/NAM_Alaska_45km_conduit_20100913_0000.grib2"));
   }
 
   /*
@@ -168,7 +171,7 @@ public class TestTdsDodsServer {
   }
 
   public void testCompareWithFile() throws IOException {
-    final String urlPrefix = TestWithLocalServer.server+"/dodsC/opendapTest/";
+    final String urlPrefix = TestWithLocalServer.withPath("/dodsC/opendapTest/");
     final String dirName = TestDir.cdmUnitTestDir + "tds/opendap/";  // read all files from this dir
 
     TestDir.actOnAll(dirName, new TestDir.FileFilterNoWant(".gbx8 .gbx9 .ncx"), new TestDir.Act() {

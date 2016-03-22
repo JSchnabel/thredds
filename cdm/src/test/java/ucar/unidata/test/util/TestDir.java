@@ -1,15 +1,14 @@
 package ucar.unidata.test.util;
 
+import thredds.featurecollection.FeatureCollectionConfigBuilder;
+import thredds.util.PathAliasReplacementFromMap;
 import ucar.ma2.InvalidRangeException;
 import ucar.ma2.Section;
 import ucar.nc2.NetcdfFile;
 import ucar.nc2.Variable;
 import ucar.unidata.io.RandomAccessFile;
 
-import java.io.File;
-import java.io.FileFilter;
-import java.io.FileInputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.*;
 
 /**
@@ -17,8 +16,8 @@ import java.util.*;
  *
  * @author caron
  * @since 3/23/12
- * Modified 5/15/14 to add remote test server paths
- * 
+ * Modified 12/31/15 to add various test server paths
+ *
  * This singleton class computes and stores a variety of constants.
  * <p>
  * <table>
@@ -32,8 +31,13 @@ import java.util.*;
  *     <td>Filename of the user property file read from the "user.home" directory
  *         if the "unidata.testdata.path" and "unidata.upc.share.path" are not
  *         available as system properties.
+ * <tr><td>threddsServerPropName<td>thredds
+ *     <td>Property name for the hostname of standard thredds server. Only used in
+ *         classes that explicitly reference motherlode.
+ * <tr><td>threddsTestServerPropName<td>thredds-test
+ *     <td>Property name for the hostname of the Java library thredds test server.
  * <tr><td>remoteTestServerPropName<td>remotetest
- *     <td>Property name for the hostname of the remote test server.
+ *     <td>Property name for the hostname of the C-library remote test server.
  * </table>
  * <p>
  * <table>
@@ -46,13 +50,19 @@ import java.util.*;
  *     <td>Level 1 test data directory (distributed with code and MAY be used in Unidata nightly testing).
  * <tr><td>temporaryLocalTestDataDir<td>NA<td>target/test/tmp
  *     <td>Temporary data directory (for writing temporary data).
+ * <tr><td>threddsServer<td>threddsserver<td>thredds.ucar.edu
+ *     <td>The hostname of the standard thredds server.
+ * <tr><td>threddsTestServer<td>threddstestserver<td>thredds-test.unidata.ucar.edu
+ *     <td>The hostname of the standard thredds test server.
  * <tr><td>remoteTestServer<td>remotetestserver<td>remotetest.unidata.ucar.edu
- *     <td>The hostname of the test server for doing remote tests
+ *     <td>The hostname of the test server for doing C library remote tests
  * </table>
  *
  */
 public class TestDir {
-  /** path to the Unidata test data directory */
+  /**
+   * path to the Unidata test data directory
+   */
   public static String testdataDir = null;
 
   /**
@@ -67,27 +77,48 @@ public class TestDir {
   public static String cdmLocalTestDataDir = "../cdm/src/test/data/";
 
   /**
+   * cdm-test data directory (distributed with code but depends on data not in github)
+   */
+  public static String cdmTestDataDir = "../cdm-test/src/test/data/";
+
+  /**
    * Temporary data directory (for writing temporary data).
    */
-  public static String temporaryLocalDataDir = "target/test/tmp/";
+  public static String temporaryLocalDataDir = "build/test/tmp/";
 
   //////////////////////////////////////////////////////////////////////
-  /** Property name for the path to the Unidata test data directory,
+  /**
+   * Property name for the path to the Unidata test data directory,
    * e.g unidata.testdata2.path=//shemp/data/testdata2/
    * the real directory is at shemp:/data/testdata2
    */
   private static String testdataDirPropName ="unidata.testdata.path";
 
-  /** Filename of the user property file read from the "user.home" directory
+  /**
+   * Filename of the user property file read from the "user.home" directory
    * if the "unidata.testdata2.path" and "unidata.upc.share.path" are not
-   * available as system properties. */
+   * available as system properties.
+   */
   private static String threddsPropFileName = "thredds.properties";
+
+  //////////////////////////////////////////////////////////////////////
+  // Various Test Server machines
+  //////////////////////////////////////////////////////////////////////
+
+  // thredds and thredd-test Test servers (for testing)
+  // thredds can go away when misc. obsolete tests go away
+
+  static public String threddsServerPropName = "threddsserver";
+  static public String threddsServer = "thredds.ucar.edu";
+
+  static public String threddsTestServerPropName = "threddstestserver";
+  static public String threddsTestServer = "thredds-test.unidata.ucar.edu";
 
   // Remote Test server(s)
 
-  private static String threddsTestServerPropName = "threddstestserver";
+  private static String remoteTestServerPropName = "remotetestserver";
 
-  static public String threddsTestServer = "remotetest.unidata.ucar.edu";
+  static public String remoteTestServer = "remotetest.unidata.ucar.edu";
 
   // DAP 2 Test server (for testing)
 
@@ -117,8 +148,7 @@ public class TestDir {
         Properties userThreddsProps = new Properties();
         try {
           userThreddsProps.load( new FileInputStream( userThreddsPropsFile ) );
-        }
-        catch ( IOException e ) {
+        } catch ( IOException e ) {
           System.err.println( "**Failed loading user THREDDS property file: " + e.getMessage() );
         }
         if ( userThreddsProps != null && ! userThreddsProps.isEmpty() ) {
@@ -152,9 +182,19 @@ public class TestDir {
       }
     }
 
-    String rts = System.getProperty(threddsTestServerPropName);
+    // Initialize various server values
+
+    String ts = System.getProperty(threddsServerPropName);
+    if(ts != null && ts.length() > 0)
+      	threddsServer = ts;
+
+    String tts = System.getProperty(threddsTestServerPropName);
+    if(tts != null && tts.length() > 0)
+      	threddsTestServer = tts;
+
+    String rts = System.getProperty(remoteTestServerPropName);
 	if(rts != null && rts.length() > 0)
-		threddsTestServer = rts;
+		remoteTestServer = rts;
 
     String dts = System.getProperty(dap2TestServerPropName);
       if(dts != null && dts.length() > 0)
@@ -163,6 +203,9 @@ public class TestDir {
     String d4ts = System.getProperty(dap4TestServerPropName);
     if(d4ts != null && d4ts.length() > 0)
       	dap4TestServer = d4ts;
+
+    PathAliasReplacementFromMap replace = new PathAliasReplacementFromMap("${cdmUnitTest}", cdmUnitTestDir);
+    FeatureCollectionConfigBuilder.setPathAliasReplacement(replace);
   }
 
   static public void showMem(String where) {
@@ -172,8 +215,6 @@ public class TestDir {
         " max= " + runtime.maxMemory() * .001 * .001 +
         " MB");
   }
-
-  // from testLocal
 
   private static boolean dumpFile = false;
 
@@ -205,7 +246,7 @@ public class TestDir {
     return open( TestDir.cdmLocalTestDataDir +filename);
   }
 
-  static public void checkLeaks() {
+  static public long checkLeaks() {
     if (RandomAccessFile.getOpenFiles().size() > 0) {
       System.out.printf("%nRandomAccessFile still open:%n");
       for (String filename : RandomAccessFile.getOpenFiles()) {
@@ -215,6 +256,7 @@ public class TestDir {
       System.out.printf("RandomAccessFile: no leaks%n");
     }
     System.out.printf("RandomAccessFile: count open=%d, max=%d%n", RandomAccessFile.getOpenFileCount(), RandomAccessFile.getMaxOpenFileCount());
+    return RandomAccessFile.getOpenFiles().size();
   }
 
 
@@ -257,6 +299,16 @@ public class TestDir {
     }
   }
 
+  //
+
+  /**
+   * Call act.doAct() of each file in dirName passing
+   * @param dirName
+   * @param ff
+   * @param act
+   * @return
+   * @throws IOException
+   */
   public static int actOnAll(String dirName, FileFilter ff, Act act) throws IOException {
     return actOnAll( dirName, ff, act, true);
   }
@@ -295,7 +347,7 @@ public class TestDir {
     File[] allFiles = allDir.listFiles();
     if (null == allFiles) {
       System.out.println("---------------INVALID "+dirName);
-      return count;
+      throw new FileNotFoundException("Cant open "+dirName);
     }
     List<File> flist = Arrays.asList(allFiles);
     Collections.sort(flist);
@@ -324,19 +376,18 @@ public class TestDir {
   public static int readAllDir(String dirName, FileFilter ff) throws IOException {
     return actOnAll(dirName, ff, new ReadAllVariables());
   }
-  
+
   public static void readAll(String filename) throws IOException {
     ReadAllVariables act = new ReadAllVariables();
     act.doAct(filename);
   }
-  
+
   private static class ReadAllVariables implements Act {
 
     @Override
     public int doAct(String filename) throws IOException {
       System.out.println("\n------Reading filename "+filename);
       try (NetcdfFile ncfile = NetcdfFile.open(filename)) {
-
         for (Variable v : ncfile.getVariables()) {
           if (v.getSize() > max_size) {
             Section s = makeSubset(v);
@@ -347,10 +398,8 @@ public class TestDir {
             v.read();
           }
         }
-      } catch (Exception e) {
-        e.printStackTrace();
-        //assert false;
-
+      } catch (InvalidRangeException e) {
+        throw new RuntimeException(e);
       }
 
       return 1;
@@ -391,9 +440,20 @@ public class TestDir {
 
   ////////////////////////////////////////////////////
 
-  public static List<Object[]> getAllFilesInDirectory(String topdir, FileFilter filter) {
+  /**
+   * Returns all of the files in {@code topDir} that satisfy {@code filter}.
+   *
+   * @param topDir  a directory.
+   * @param filter  a file filter.
+   * @return  the files. An empty list will be returned if {@code topDir == null || !topDir.exists()}.
+   */
+  public static List<Object[]> getAllFilesInDirectory(File topDir, FileFilter filter) {
+    if (topDir == null || !topDir.exists()) {
+      return Collections.emptyList();
+    }
+
     List<File> files = new ArrayList<>();
-    File topDir = new File(topdir);
+
     for (File f : topDir.listFiles()) {
       if (filter != null && !filter.accept(f)) continue;
       files.add( f);
@@ -408,6 +468,4 @@ public class TestDir {
 
     return result;
   }
-
-
 }

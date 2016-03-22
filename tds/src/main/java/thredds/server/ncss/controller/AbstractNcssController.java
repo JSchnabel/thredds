@@ -32,7 +32,6 @@
  */
 package thredds.server.ncss.controller;
 
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -56,6 +55,7 @@ import java.util.List;
  */
 public class AbstractNcssController {
     protected static final String servletPath = "/ncss/";
+    protected static final String servletPathGrid = "/ncss/grid/";
 
     protected static final String servletCachePath = "/cache/ncss";
 
@@ -100,13 +100,12 @@ public class AbstractNcssController {
 
     ////////////////////////////////////////////////////////
     // Exception handlers
-
     @ExceptionHandler(NcssException.class)
     public ResponseEntity<String> handle(NcssException e) {
         HttpHeaders responseHeaders = new HttpHeaders();
         responseHeaders.setContentType(MediaType.TEXT_PLAIN);
 
-        return new ResponseEntity<>(ExceptionUtils.getStackTrace(e), responseHeaders, HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(e.getMessage(), responseHeaders, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(FileNotFoundException.class)
@@ -114,7 +113,7 @@ public class AbstractNcssController {
         HttpHeaders responseHeaders = new HttpHeaders();
         responseHeaders.setContentType(MediaType.TEXT_PLAIN);
 
-        return new ResponseEntity<>(ExceptionUtils.getStackTrace(e), responseHeaders, HttpStatus.NOT_FOUND);
+        return new ResponseEntity<>(e.getMessage(), responseHeaders, HttpStatus.NOT_FOUND);
     }
 
     @ExceptionHandler(UnsupportedOperationException.class)
@@ -122,7 +121,7 @@ public class AbstractNcssController {
         HttpHeaders responseHeaders = new HttpHeaders();
         responseHeaders.setContentType(MediaType.TEXT_PLAIN);
 
-        return new ResponseEntity<>(ExceptionUtils.getStackTrace(e), responseHeaders, HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(e.getMessage(), responseHeaders, HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(Throwable.class)
@@ -132,8 +131,34 @@ public class AbstractNcssController {
         HttpHeaders responseHeaders = new HttpHeaders();
         responseHeaders.setContentType(MediaType.TEXT_PLAIN);
 
-        return new ResponseEntity<>(ExceptionUtils.getStackTrace(t), responseHeaders, HttpStatus.INTERNAL_SERVER_ERROR);
+        return new ResponseEntity<>(t.getMessage(), responseHeaders, HttpStatus.INTERNAL_SERVER_ERROR);
     }
+
+  /*
+
+    @ResponseStatus(value=HttpStatus.BAD_REQUEST)
+    @ExceptionHandler(NcssException.class)
+    public void handle(NcssException e) {
+     logger.debug("NcssException", e);
+    }
+
+    @ResponseStatus(value=HttpStatus.NOT_FOUND, reason="Unknown Dataset")
+    @ExceptionHandler(FileNotFoundException.class)
+    public void handle(FileNotFoundException e) {
+      logger.debug("Not Found", e);
+    }
+
+    @ResponseStatus(value=HttpStatus.BAD_REQUEST)
+    @ExceptionHandler(UnsupportedOperationException.class)
+    public void handle(UnsupportedOperationException e) {
+      logger.debug("UnsupportedOperationException", e);
+    }
+
+    @ResponseStatus(value=HttpStatus.INTERNAL_SERVER_ERROR)
+    @ExceptionHandler(Throwable.class)
+    public void handle(Throwable t) {
+      logger.error("Uncaught exception", t);
+    }   */
 
     public static String getNCSSServletPath() {
         return servletPath;
@@ -152,10 +177,12 @@ public class AbstractNcssController {
     }
 
     public static String getDatasetPath(String path) {
-        // strip off /ncss/
-        if (path.startsWith(NcssController.servletPath)) {
-            path = path.substring(NcssController.servletPath.length());
-        }
+      if (path.startsWith(NcssController.servletPathGrid)) {               // strip off /ncss/grid/
+          path = path.substring(NcssController.servletPathGrid.length());
+
+      }  else if (path.startsWith(NcssController.servletPath)) {               // strip off /ncss/
+          path = path.substring(NcssController.servletPath.length());
+      }
 
         // strip off endings
         for (String ending : endings) {

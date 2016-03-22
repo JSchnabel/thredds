@@ -33,30 +33,29 @@
 
 package ucar.nc2.ncml;
 
+import org.jdom2.Element;
 import thredds.client.catalog.Catalog;
 import thredds.inventory.MFile;
+import ucar.ma2.Array;
+import ucar.ma2.DataType;
+import ucar.ma2.IndexIterator;
+import ucar.nc2.*;
 import ucar.nc2.constants.CDM;
 import ucar.nc2.constants.CF;
+import ucar.nc2.constants._Coordinate;
+import ucar.nc2.dataset.CoordinateAxis1DTime;
+import ucar.nc2.dataset.DatasetConstructor;
 import ucar.nc2.dataset.NetcdfDataset;
 import ucar.nc2.dataset.VariableDS;
-import ucar.nc2.dataset.DatasetConstructor;
-import ucar.nc2.dataset.CoordinateAxis1DTime;
-import ucar.nc2.constants._Coordinate;
 import ucar.nc2.time.CalendarDate;
-import ucar.nc2.util.CancelTask;
-import ucar.nc2.*;
 import ucar.nc2.units.DateUnit;
-import ucar.ma2.DataType;
-import ucar.ma2.Array;
-import ucar.ma2.IndexIterator;
+import ucar.nc2.util.CancelTask;
 
 import java.io.*;
-import java.util.*;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
-
-import org.jdom2.Element;
+import java.util.*;
 
 /**
  * JoinExisting Aggregation.
@@ -169,6 +168,8 @@ public class AggregationExisting extends AggregationOuterDimension {
     typicalDataset.close( typical);
 
     if (debugInvocation) System.out.println(ncDataset.getLocation()+" invocation count = "+AggregationOuterDimension.invocation);
+
+    ncDataset.finish();
   }
 
   protected void rebuildDataset() throws IOException {
@@ -183,7 +184,7 @@ public class AggregationExisting extends AggregationOuterDimension {
   // time units change - must read in time coords and convert, cache the results
   // must be able to be made into a CoordinateAxis1DTime
   protected void readTimeCoordinates(VariableDS timeAxis, CancelTask cancelTask) throws IOException {
-    List<CalendarDate> dateList = new ArrayList<CalendarDate>();
+    List<CalendarDate> dateList = new ArrayList<>();
     String timeUnits = null;
 
     // make concurrent
@@ -422,6 +423,8 @@ public class AggregationExisting extends AggregationOuterDimension {
             //took = .001 * .001 * .001 * (System.nanoTime() - start);
             //if (debugPersist) System.out.println("  makeArray took = " + took + " sec nelems= "+data.getSize());
             pv.putData(id, data);
+            countCacheUse++;
+
           } catch (Exception e) {
             logger.warn("Error reading cached data ",e);
           }
@@ -443,5 +446,9 @@ public class AggregationExisting extends AggregationOuterDimension {
     if (cacheName == null) cacheName = ncDataset.getCacheName();
     return cacheName;
   }
+
+  //////////////////////////////////////////////////
+  // back door for testing
+  static public int countCacheUse = 0;
 
 }

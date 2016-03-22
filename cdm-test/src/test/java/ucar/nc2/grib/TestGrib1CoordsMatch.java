@@ -36,6 +36,7 @@ package ucar.nc2.grib;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import thredds.featurecollection.FeatureCollectionConfig;
 import ucar.ma2.Array;
 import ucar.ma2.ArrayDouble;
@@ -54,6 +55,7 @@ import ucar.nc2.util.DebugFlagsImpl;
 import ucar.nc2.util.cache.FileCache;
 import ucar.nc2.util.cache.FileCacheIF;
 import ucar.unidata.io.RandomAccessFile;
+import ucar.unidata.test.util.NeedsCdmUnitTest;
 import ucar.unidata.test.util.TestDir;
 
 import java.io.File;
@@ -61,11 +63,12 @@ import java.io.IOException;
 import java.util.Formatter;
 
 /**
- * Describe
+ * Test Grib1Coords from data Match whats in the ncx3 files
  *
  * @author caron
  * @since 11/5/2014
  */
+@Category(NeedsCdmUnitTest.class)
 public class TestGrib1CoordsMatch {
   private static FeatureCollectionConfig config = new FeatureCollectionConfig(); // default values
 
@@ -133,7 +136,7 @@ public class TestGrib1CoordsMatch {
 
   }
 
-  //@Test
+  @Test
   public void testGC() throws IOException {
     TestGribCollections.Count count = read(TestDir.cdmUnitTestDir + "gribCollections/gfs_conus80/20141024/GFS_CONUS_80km_20141024_1200.grib1.ncx3");
 
@@ -143,24 +146,24 @@ public class TestGrib1CoordsMatch {
     assert count.nerrs == 0;
   }
 
-  //@Test
+  @Test
   public void testPofG() throws IOException {                //ncss/GFS/CONUS_80km/GFS_CONUS_80km-CONUS_80km.ncx2
     TestGribCollections.Count count = read(TestDir.cdmUnitTestDir + "gribCollections/gfs_conus80/20141024/gfsConus80_46-20141024.ncx3");
 
     System.out.printf("%n%50s == %d/%d/%d%n", "total", count.nerrs, count.nmiss, count.nread);
-    assert count.nread == 37188;   // 1801/81340 ??
-    assert count.nmiss == 816;
+    assert count.nread == 36216;   // 1801/81340 ??
+    assert count.nmiss == 771;
     assert count.nerrs == 0;
   }
 
 
-  //@Test
+  @Test
   public void testPofP() throws IOException {
     TestGribCollections.Count count = read(TestDir.cdmUnitTestDir + "gribCollections/gfs_conus80/gfsConus80_46.ncx3");
 
     System.out.printf("%n%50s == %d/%d/%d%n", "total", count.nerrs, count.nmiss, count.nread);
-    assert count.nread == 51838;
-    assert count.nmiss == 1126;
+    assert count.nread == 50864;
+    assert count.nmiss == 1081;
     assert count.nerrs == 0;
   }
 
@@ -168,13 +171,14 @@ public class TestGrib1CoordsMatch {
   public void testRdavmDs083p2() throws IOException {
     String filename = TestDir.cdmUnitTestDir + "gribCollections/rdavm/ds083.2/PofP/ds083.2-pofp.ncx3";
     File fileInCache = GribIndexCache.getExistingFileOrCache(filename);
+    assert fileInCache != null;
     TestGribCollections.Count count = read( fileInCache.getPath());
 
     // that took 63 secs total, 1.471143 msecs per record total == 4624/33718/43248
     System.out.printf("%n%50s == %d/%d/%d%n", "total", count.nerrs, count.nmiss, count.nread);
     assert count.nread == 43248;
-    assert count.nmiss == 33718;
-    assert count.nerrs == 4624;
+    assert count.nmiss == 2112;
+    assert count.nerrs == 0;
   }
 
   /*

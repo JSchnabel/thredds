@@ -41,7 +41,7 @@ import ucar.unidata.util.StringUtil2;
 import java.util.*;
 
 /**
- * Beans for FeatureCollection configuration
+ * FeatureCollection configuration
  *
  * @author caron
  * @since Mar 30, 2010
@@ -74,6 +74,7 @@ public class FeatureCollectionConfig {
   public static void setRegularizeDefault(boolean t) {
     regularizeDefault = t;
   }
+
   public static boolean getRegularizeDefault() {
     return regularizeDefault;
   }
@@ -83,10 +84,11 @@ public class FeatureCollectionConfig {
 
   //////////////////////////////////////////////
 
+  public String name, path, spec, collectionName, dateFormatMark, olderThan;
+  private String rootDir, regExp;
   public FeatureCollectionType type;
   public PartitionType ptype = PartitionType.directory;
   public CalendarPeriod timePeriod;
-  public String name, path, spec, collectionName, dateFormatMark, olderThan;
   public UpdateConfig tdmConfig = new UpdateConfig();
   public UpdateConfig updateConfig = new UpdateConfig();
   public ProtoConfig protoConfig = new ProtoConfig();
@@ -101,7 +103,7 @@ public class FeatureCollectionConfig {
   public FeatureCollectionConfig(String name, String path, FeatureCollectionType fcType, String spec, String collectionName,
                                  String dateFormatMark, String olderThan, String timePartition, Element innerNcml) {
     this.name = name;
-    this.path = path;
+    this.path = StringUtil2.trim(path, '/');
     this.type = fcType;
     this.spec = spec;
     this.collectionName = collectionName == null ? name : collectionName;
@@ -115,15 +117,27 @@ public class FeatureCollectionConfig {
         timePeriod = CalendarPeriod.of(timePartition);
         ptype = PartitionType.timePeriod;
         if (timePeriod == null)
-          throw new IllegalArgumentException("Illegal timePeriod= "+timePartition);
+          throw new IllegalArgumentException("Illegal timePeriod= " + timePartition);
       }
     }
     this.innerNcml = innerNcml;
   }
 
+  public void setFilter(String rootDir, String regExp) {
+    this.rootDir = rootDir;
+    this.regExp = regExp;
+  }
+
+  public CollectionSpecParser getCollectionSpecParser(Formatter errlog) {
+    if (rootDir != null)
+      return new CollectionSpecParser(rootDir, regExp, errlog);
+    else
+      return new CollectionSpecParser(spec, errlog);
+  }
+
+
   public boolean isTrigggerOk() {
-    if (updateConfig.triggerOk) return true;
-    return (tdmConfig != null) && tdmConfig.triggerOk;
+    return updateConfig.triggerOk || (tdmConfig != null) && tdmConfig.triggerOk;
   }
 
   @Override
@@ -131,6 +145,8 @@ public class FeatureCollectionConfig {
     Formatter f = new Formatter();
     f.format("FeatureCollectionConfig name ='%s' collectionName='%s' type='%s'%n", name, collectionName, type);
     f.format("  spec='%s'%n", spec);
+    if (rootDir != null)
+      f.format("  rootDir= '%s' regExp= '%s'%n", rootDir, regExp);
     if (dateFormatMark != null)
       f.format("  dateFormatMark ='%s'%n", dateFormatMark);
     if (olderThan != null)
@@ -165,13 +181,18 @@ public class FeatureCollectionConfig {
   }
 
   public void show(Formatter f) {
-    f.format("FeatureCollectionConfig name ='%s' collectionName='%s' type='%s'%n", name, collectionName, type);
-    f.format("  spec='%s'%n", spec);
+    f.format("FeatureCollectionConfig name= '%s' collectionName= '%s' type= '%s'%n", name, collectionName, type);
+    f.format("  spec= '%s'%n", spec);
+    if (rootDir != null)
+      f.format("  rootDir= '%s' regExp= '%s'%n", rootDir, regExp);
     if (dateFormatMark != null)
-      f.format("  dateFormatMark ='%s'%n", dateFormatMark);
+      f.format("  dateFormatMark='%s'%n", dateFormatMark);
     if (olderThan != null)
-      f.format("  olderThan =%s%n", olderThan);
-    f.format("  timePartition =%s%n", ptype);
+      f.format("  olderThan= %s%n", olderThan);
+    if (ptype == PartitionType.timePeriod)
+      f.format("  timePartition= %s %n", timePeriod);
+    else
+      f.format("  timePartition= %s%n", ptype);
 
     if (type != null) {
       switch (type) {
@@ -180,12 +201,12 @@ public class FeatureCollectionConfig {
           gribConfig.show(f);
           break;
         case FMRC:
-          f.format("  fmrcConfig =%s%n", fmrcConfig);
+          f.format("  fmrcConfig= %s%n", fmrcConfig);
           break;
         case Point:
         case Station:
         case Station_Profile:
-          f.format("  pointConfig =%s%n", pointConfig);
+          f.format("  pointConfig= %s%n", pointConfig);
           break;
       }
     }
@@ -212,7 +233,7 @@ public class FeatureCollectionConfig {
     if (dateFormatMark != null)
       return new DateExtractorFromName(dateFormatMark, false);
     else {
-      CollectionSpecParser sp = new CollectionSpecParser(spec, null);
+      CollectionSpecParser sp = getCollectionSpecParser(null);
       if (sp.getDateFormatMark() != null)
         return new DateExtractorFromName(sp.getDateFormatMark(), true);
     }
@@ -510,7 +531,7 @@ public class FeatureCollectionConfig {
 
       Element pdsHashElement = configElem.getChild("pdsHash", ns);
       useGenType = readValue(pdsHashElement, "useGenType", ns, useGenTypeDef);
-      useTableVersion = readValue(pdsHashElement, "useTableVersion", ns, useTableVersionDef);  // LOOK maybe default should be false ??
+      useTableVersion = readValue(pdsHashElement, "useTableVersion", ns, useTableVersionDef);
       intvMerge = readValue(pdsHashElement, "intvMerge", ns, intvMergeDef);
       useCenter = readValue(pdsHashElement, "useCenter", ns, useCenterDef);
     }
@@ -537,6 +558,10 @@ public class FeatureCollectionConfig {
     public void setExcludeZero(boolean val) {
       if (intvFilter == null) intvFilter = new GribIntvFilter();
       intvFilter.isZeroExcluded = val;
+    }
+
+    public void setUseTableVersion(boolean val) {
+      useTableVersion = val;
     }
 
     public void setIntervalLength(int intvLength, String varId) {
@@ -617,7 +642,7 @@ public class FeatureCollectionConfig {
     }
 
     public void show(Formatter f) {
-      f.format("GribConfig ");
+      f.format("GribConfig= ");
       if (useGenType != useGenTypeDef) f.format(" useGenType=%s", useGenType);
       if (useTableVersion != useTableVersionDef) f.format(" useTableVersion=%s", useTableVersion);
       if (intvMerge != intvMergeDef) f.format(" intvMerge=%s", intvMerge);

@@ -128,10 +128,6 @@
     <filter-name>RequestQueryFilterAllowAngleBrackets</filter-name>
     <servlet-name>Opendap</servlet-name>
   </filter-mapping>
-  <filter-mapping>
-    <filter-name>RequestQueryFilterAllowAngleBrackets</filter-name>
-    <servlet-name>dap4</servlet-name>
-  </filter-mapping>
 
   <!--
   Filter all requests that contain parameters used by CatalogServices
@@ -147,10 +143,6 @@
   <filter-mapping>
     <filter-name>CookieFilter</filter-name>
     <servlet-name>Opendap</servlet-name>
-  </filter-mapping>
-  <filter-mapping>
-    <filter-name>CookieFilter</filter-name>
-    <servlet-name>dap4</servlet-name>
   </filter-mapping>
 
   <!--
@@ -181,18 +173,6 @@
     <param-name>contextConfigLocation</param-name>
     <param-value>/WEB-INF/applicationContext-tdsConfig.xml</param-value>
   </context-param>
-
-  <!-- needed for intelliJ startup; check if needed for regular war
-      https://issues.apache.org/jira/browse/LOG4J2-223
-      Provided the Log4jContextListener is configured in web.xml shutdown now works fine with Tomcat 7 with revision 1484363.
-      LOOK: unsure if this is needed with latest log4j2
-      changed to Log4jServletContainerInitializer
-      see http://logging.apache.org/log4j/2.x/log4j-core/apidocs/index.html
-      -->
-  <listener>
-    <!--listener-class>org.apache.logging.log4j.core.web.Log4jServletContextListener</listener-class-->
-    <listener-class>org.apache.logging.log4j.core.web.Log4jServletContainerInitializer</listener-class>
-  </listener>
 
   <listener>
     <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
@@ -247,13 +227,6 @@
     <servlet-name>Opendap</servlet-name>
     <servlet-class>thredds.server.opendap.OpendapServlet</servlet-class>
     <load-on-startup>2</load-on-startup>
-  </servlet>
-  <!-- NetCDF/Dap4 server -->
-  <servlet>
-    <display-name>Dap4 Server</display-name>
-    <servlet-name>dap4</servlet-name>
-    <servlet-class>thredds.server.dap4.Dap4Servlet</servlet-class>
-    <load-on-startup>3</load-on-startup>
   </servlet>
 
   <!-- HTTP File server -->
@@ -405,11 +378,6 @@
     <url-pattern>/dodsC/*</url-pattern>
   </servlet-mapping>
 
-  <servlet-mapping>
-    <servlet-name>dap4</servlet-name>
-    <url-pattern>/dap4/*</url-pattern>
-  </servlet-mapping>
-
   <!-- servlet-mapping>
     <servlet-name>FileServer</servlet-name>
     <url-pattern>/fileServer/*</url-pattern>
@@ -455,29 +423,21 @@
   </error-page>
 
   <!-- ++++++++++ Setup security restrictions ++++++++++ -->
-  <!-- Default is to not allow DELETE, PUT, POST -->
+  <!-- Do not allow anything but GET  LOOK doesnt work
   <security-constraint>
-    <web-resource-collection>
-      <web-resource-name>not allowed</web-resource-name>
-      <url-pattern>/*</url-pattern>
-      <http-method>DELETE</http-method>
-      <http-method>PUT</http-method>
-      <!-- http-method>POST</http-method -->
-    </web-resource-collection>
-    <auth-constraint/>
-  </security-constraint>
+      <display-name>Deny all HTTP methods except GET</display-name>
+      <web-resource-collection>
+          <url-pattern>/</url-pattern>
+          <http-method-omission>GET</http-method-omission>
+      </web-resource-collection>
+      <auth-constraint/>
+  </security-constraint -->
 
-  <!-- This allows "remote configuration":
-    /thredds/admin/debug gives access to various debug and status info.
-    /thredds/admin/content/ -> "{tomcat_home}/content/thredds/"
-    /thredds/admin/root/ -> "{tomcat_home}/webapps/thredds/" DISABLED
-    /thredds/admin/dataDir/path -> "{dataRoot(path)}/webapps/thredds/"  DISABLED
-   -->
+  <!-- tdsConfig with HTTPS needed for /admin access  -->
   <security-constraint>
     <web-resource-collection>
       <web-resource-name>sensitive read access</web-resource-name>
       <url-pattern>/admin/*</url-pattern>
-      <!-- http-method>GET</http-method -->
     </web-resource-collection>
     <auth-constraint>
       <role-name>tdsConfig</role-name>
@@ -487,11 +447,12 @@
     </user-data-constraint>
   </security-constraint>
 
+  <!-- tdsTrigger with HTTPS needed for /admin/trigger  -->
   <security-constraint>
     <web-resource-collection>
       <web-resource-name>allow feature collection rescan to be triggered externally</web-resource-name>
       <url-pattern>/admin/collection/trigger</url-pattern>
-      <!-- http-method>GET</http-method -->
+      <url-pattern>/admin/trigger</url-pattern>
     </web-resource-collection>
     <auth-constraint>
       <role-name>tdsTrigger</role-name>
@@ -505,11 +466,11 @@
     /thredds/admin/log gives access to logs.
    -->
 
+  <!-- tdsMonitor with HTTPS needed for access to logs  -->
   <security-constraint>
     <web-resource-collection>
       <web-resource-name>sensitive read access</web-resource-name>
       <url-pattern>/admin/log/*</url-pattern>
-      <!-- http-method>GET</http-method -->
     </web-resource-collection>
     <auth-constraint>
       <role-name>tdsMonitor</role-name>
@@ -519,28 +480,11 @@
     </user-data-constraint>
   </security-constraint>
 
-  <!-- Setup security restrictions on THREDDS server HTTP POST capabilities in CatalogGen. -->
-  <!-- security-constraint>
-    <web-resource-collection>
-      <web-resource-name>cataloggen configuration</web-resource-name>
-      <url-pattern>/cataloggen/admin/*</url-pattern>
-      <http-method>GET</http-method>
-      <http-method>POST</http-method>
-    </web-resource-collection>
-    <auth-constraint>
-      <role-name>tdsConfig</role-name>
-    </auth-constraint>
-    <user-data-constraint>
-      <transport-guarantee>CONFIDENTIAL</transport-guarantee>
-    </user-data-constraint>
-  </security-constraint-->
-
-  <!-- default restricted access uses DIGEST, but not HTTPS -->
+  <!-- default restricted access dataset uses DIGEST, but not HTTPS -->
   <security-constraint>
     <web-resource-collection>
       <web-resource-name>restricted access datasets</web-resource-name>
       <url-pattern>/restrictedAccess/*</url-pattern>
-      <!-- http-method>GET</http-method -->
     </web-resource-collection>
     <auth-constraint>
       <role-name>restrictedDatasetUser</role-name>

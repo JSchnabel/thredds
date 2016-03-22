@@ -32,6 +32,9 @@
  */
 package thredds.inventory;
 
+import java.nio.file.FileSystems;
+import java.nio.file.Path;
+import java.nio.file.PathMatcher;
 import java.util.*;
 import java.util.regex.Pattern;
 import java.io.File;
@@ -67,6 +70,7 @@ public class CollectionSpecParser {
   private final String spec;
   private final String rootDir;
   private final boolean subdirs; // recurse into subdirectories under the root dir
+  private final boolean filterOnName; // filter on name, else on entire path
   private final java.util.regex.Pattern filter; // regexp filter
   private final String dateFormatMark;
 
@@ -136,10 +140,33 @@ public class CollectionSpecParser {
       dateFormatMark = null;
       this.filter = null;
     }
+
+    this.filterOnName = true;
   }
 
-  public String getSpec() {
-    return spec;
+  public CollectionSpecParser(String rootDir, String regExp, Formatter errlog) {
+    this.rootDir = StringUtil2.removeFromEnd(rootDir, '/');
+    this.subdirs = true;
+    this.spec = this.rootDir +"/" + regExp;
+    this.filter = java.util.regex.Pattern.compile(spec);
+    this.dateFormatMark = null;
+    this.filterOnName = false;
+  }
+
+  public PathMatcher getPathMatcher() {
+    if (spec.startsWith("regex:") || spec.startsWith("glob:")) {  // experimental
+      return FileSystems.getDefault().getPathMatcher(spec);
+    } else {
+      return new BySpecp();
+    }
+  }
+
+  private class BySpecp implements java.nio.file.PathMatcher {
+    @Override
+    public boolean matches(Path path) {
+      java.util.regex.Matcher matcher = filter.matcher(path.getFileName().toString());
+      return matcher.matches();
+    }
   }
 
   public String getRootDir() {
@@ -152,6 +179,10 @@ public class CollectionSpecParser {
 
   public Pattern getFilter() {
     return filter;
+  }
+
+  public boolean getFilterOnName() {
+    return filterOnName;
   }
 
   public String getDateFormatMark() {
@@ -199,6 +230,12 @@ public class CollectionSpecParser {
 
 
   public static void main(String arg[]) {
+    /*
+    US058GMET-GR1mdl.0018_0056_00000F0..#yyyyMMddHH#_0102_000000-000000pres$
+    FNMOC_NAVGEM_0.5-degree_6-hourly_Pressure-201302.ncx3 */
+
+    doit("/u00/FNMOC/NAVGEM/pressure/**/US058GMET-GR1mdl.0018_0056_00000F0..#yyyyMMddHH#_0102_000000-000000pres$", new Formatter());
+
     doit("/data/ldm/pub/native/grid/NCEP/GFS/Alaska_191km/**/GFS_Alaska_191km_#yyyyMMdd_HHmm#\\.grib1$", new Formatter());
     doit("Q:/grid/grib/grib1/data/agg/.*\\.grb", new Formatter());
     doit("/data/ldm/pub/decoded/netcdf/surface/metar/**/Surface_METAR_#yyyyMMdd_HHmm#\\.nc", new Formatter());

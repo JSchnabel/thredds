@@ -96,6 +96,7 @@ public class TableAnalyzer {
     registerAnalyzer("BuoyShip-NetCDF", BuoyShipSynop.class, null);
     registerAnalyzer("NCAR-RAF/nimbus", RafNimbus.class, null);
     registerAnalyzer("NLDN-CDM", Nldn.class, null);
+    registerAnalyzer("SimpleTrajectory", SimpleTrajectory.class, null);
 
     // further calls to registerConvention are by the user
     userMode = true;
@@ -312,8 +313,14 @@ public class TableAnalyzer {
 
   public boolean featureTypeOk(FeatureType ftype, Formatter errlog) {
     for (NestedTable nt : leaves) {
-      if (!nt.hasCoords())
+      if (!nt.hasCoords()) {
         errlog.format("Table %s featureType %s: lat/lon/time coord not found%n", nt.getName(), nt.getFeatureType());
+        try {
+          writeConfigXML(errlog);
+        } catch (IOException e) {
+         log.error("featuretypeOk", e);
+        }
+      }
 
       if (!FeatureDatasetFactoryManager.featureTypeOk(ftype, nt.getFeatureType()))
         errlog.format("Table %s featureType %s doesnt match desired type %s%n", nt.getName(), nt.getFeatureType(), ftype);

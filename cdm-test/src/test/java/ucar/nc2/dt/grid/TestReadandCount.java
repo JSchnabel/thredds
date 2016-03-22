@@ -32,6 +32,7 @@
  */
 package ucar.nc2.dt.grid;
 
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import ucar.nc2.constants.CDM;
@@ -39,6 +40,7 @@ import ucar.nc2.dataset.CoordinateAxis;
 import ucar.nc2.dataset.NetcdfDataset;
 import ucar.nc2.constants.AxisType;
 import ucar.nc2.ncml.NcMLReader;
+import ucar.unidata.test.util.NeedsCdmUnitTest;
 import ucar.unidata.test.util.TestDir;
 
 import java.util.ArrayList;
@@ -49,13 +51,14 @@ import java.io.ByteArrayInputStream;
 /** Count geogrid objects - sanity check when anything changes. */
 
 @RunWith(Parameterized.class)
+@Category(NeedsCdmUnitTest.class)
 public class TestReadandCount {
   private static final boolean show = false, showCount = true;
   private static String griddir = TestDir.cdmUnitTestDir +"conventions/";
   private static String grib1dir = TestDir.cdmUnitTestDir +"formats/grib1/";
   private static String grib2dir = TestDir.cdmUnitTestDir +"formats/grib2/";
 
-  @Parameterized.Parameters
+  @Parameterized.Parameters(name="{0}")
   public static List<Object[]> getTestParameters() {
     List<Object[]> result = new ArrayList<>();
 
@@ -216,9 +219,9 @@ public class TestReadandCount {
   }
 
   static public void doOne( String dir, String name, int ngrids, int ncoordSys, int ncoordAxes, int nVertCooordAxes) throws Exception {
-    System.out.println("test read GridDataset = " + dir + name);
-
+    System.out.printf("test read GridDataset= %s%s%n", dir, name);
     ucar.nc2.dt.grid.GridDataset gridDs = GridDataset.open(dir + name);
+    System.out.printf(" location= %s%n%n", gridDs.getLocation());
 
     int countGrids = gridDs.getGrids().size();
     int countCoordAxes = gridDs.getNetcdfDataset().getCoordinateAxes().size();

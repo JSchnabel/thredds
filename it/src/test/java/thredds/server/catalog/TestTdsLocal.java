@@ -33,19 +33,22 @@
 package thredds.server.catalog;
 
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import thredds.TestWithLocalServer;
 import thredds.client.catalog.Catalog;
 import thredds.client.catalog.builder.CatalogBuilder;
+import ucar.unidata.test.util.NeedsCdmUnitTest;
 
 /**
  * Test catalog utilities
  */
+@Category(NeedsCdmUnitTest.class)
 public class TestTdsLocal {
   public static boolean showValidationMessages = false;
 
   public static Catalog open(String catalogName) {
     if (catalogName == null) catalogName = "/catalog.xml";
-    String catalogPath = TestWithLocalServer.server + catalogName;
+    String catalogPath = TestWithLocalServer.withPath(catalogName);
     System.out.println("\n open= "+catalogPath);
 
     try {

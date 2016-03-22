@@ -33,15 +33,17 @@
 
 package ucar.unidata.io.http;
 
-import ucar.httpservices.*;
 import org.apache.http.Header;
+import ucar.httpservices.HTTPFactory;
+import ucar.httpservices.HTTPMethod;
+import ucar.httpservices.HTTPSession;
 import ucar.unidata.util.Urlencoded;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.channels.WritableByteChannel;
 import java.nio.ByteBuffer;
+import java.nio.channels.WritableByteChannel;
 
 /**
  * Gives access to files over HTTP, using "Accept-Ranges" HTTP header to do random access.
@@ -53,7 +55,8 @@ import java.nio.ByteBuffer;
  */
 
 public class HTTPRandomAccessFile extends ucar.unidata.io.RandomAccessFile {
-  static public int defaultHTTPBufferSize = 20000;
+  static public final int defaultHTTPBufferSize = 20 * 1000;       // 20K
+  static public final int maxHTTPBufferSize = 10 * 1000 * 1000;     // 10 M
   static private final boolean debug = false, debugDetails = false;
 
   ///////////////////////////////////////////////////////////////////////////////////
@@ -80,9 +83,8 @@ public class HTTPRandomAccessFile extends ucar.unidata.io.RandomAccessFile {
 
     boolean needtest = true;
 
-    HTTPMethod method = null;
-    try {
-      method = HTTPFactory.Head(session);
+    try (
+      HTTPMethod method = HTTPFactory.Head(session,url)) {
 
       doConnect(method);
 
@@ -106,17 +108,22 @@ public class HTTPRandomAccessFile extends ucar.unidata.io.RandomAccessFile {
         total_length = Long.parseLong(head.getValue());
         /* Some HTTP server report 0 bytes length. 
          * Do the Range bytes test if the server is reporting 0 bytes length*/
-        if(total_length==0) needtest = true;
+        if (total_length==0) needtest = true;
       } catch (NumberFormatException e) {
         throw new IOException("Server has malformed Content-Length header");
       }
 
-    } finally {
-      if (method != null) method.close();
     }
 
     if (needtest && !rangeOk(url))
       throw new IOException("Server does not support byte Ranges");
+
+    if (total_length > 0) {
+      // this means that we will read the file in one gulp then deal with it in memory
+      int useBuffer = (int) Math.min(total_length, maxHTTPBufferSize); // entire file size if possible
+      useBuffer = Math.max(useBuffer, defaultHTTPBufferSize); // minimum buffer
+      setBufferSize(useBuffer);
+    }
 
     if (debugLeaks) openFiles.add(location);
   }
@@ -131,27 +138,24 @@ public class HTTPRandomAccessFile extends ucar.unidata.io.RandomAccessFile {
     }
   }
 
-  private boolean rangeOk(String url) {
-    HTTPMethod method = null;
+  private boolean rangeOk(String url)
+  {
     try {
-      method = HTTPFactory.Get(session,url);
-      method.setRequestHeader("Range", "bytes=" + 0 + "-" + 0);
-      doConnect(method);
+      try (HTTPMethod method = HTTPFactory.Get(session, url)) {
+        method.setRange(0,0);
+        doConnect(method);
 
-      int code = method.getStatusCode();
-      if (code != 206)
-        throw new IOException("Server does not support Range requests, code= " + code);
-      Header head = method.getResponseHeader("Content-Range");
-      total_length=Long.parseLong(head.getValue().substring(head.getValue().lastIndexOf("/")+1));
-      // clear stream
-      method.close();
-      return true;
-
+        int code = method.getStatusCode();
+        if(code != 206)
+          throw new IOException("Server does not support Range requests, code= " + code);
+        Header head = method.getResponseHeader("Content-Range");
+        total_length = Long.parseLong(head.getValue().substring(head.getValue().lastIndexOf("/") + 1));
+        // clear stream
+        method.close();
+        return true;
+      }
     } catch (IOException e) {
       return false;
-
-    } finally {
-      if (method != null) method.close();
     }
   }
 
@@ -168,7 +172,7 @@ public class HTTPRandomAccessFile extends ucar.unidata.io.RandomAccessFile {
 
     if (debugDetails) {
       // request headers dont seem to be available until after execute()
-      printHeaders("Request: " + method.getName() + " " + method.getPath(), method.getRequestHeaders());
+      printHeaders("Request: " + method.getURL(), method.getRequestHeaders());
       printHeaders("Response: " + method.getStatusCode(), method.getResponseHeaders());
     }
   }
@@ -200,11 +204,9 @@ public class HTTPRandomAccessFile extends ucar.unidata.io.RandomAccessFile {
 
     if (debug) System.out.println(" HTTPRandomAccessFile bytes=" + pos + "-" + end + ": ");
 
-    HTTPMethod method = null;
-    try {
-      method = HTTPFactory.Get(session);
+    try (HTTPMethod method = HTTPFactory.Get(session,url)) {
       method.setFollowRedirects(true);
-      method.setRequestHeader("Range", "bytes=" + pos + "-" + end);
+      method.setRange(pos,end);
       doConnect(method);
 
       int code = method.getStatusCode();
@@ -222,8 +224,6 @@ public class HTTPRandomAccessFile extends ucar.unidata.io.RandomAccessFile {
       readLen = copy(is, buff, offset, readLen);
       return readLen;
 
-    } finally {
-      if (method != null) method.close();
     }
   }
 
@@ -258,5 +258,14 @@ public class HTTPRandomAccessFile extends ucar.unidata.io.RandomAccessFile {
       return fileLength;
   }
 
+  /**
+   * Always returns {@code 0L}, as we cannot easily determine the last time that a remote file was modified.
+   *
+   * @return  {@code 0L}, always.
+   */
+  // LOOK: An idea of how we might implement this: https://github.com/Unidata/thredds/pull/479#issuecomment-194562614
+  @Override
+  public long getLastModified() {
+    return 0;
+  }
 }
-

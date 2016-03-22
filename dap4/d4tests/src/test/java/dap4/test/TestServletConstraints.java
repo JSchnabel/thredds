@@ -1,23 +1,27 @@
 package dap4.test;
 
+import dap4.core.util.DapDump;
+import dap4.core.util.Escape;
 import dap4.dap4shared.ChunkInputStream;
-import dap4.core.util.*;
 import dap4.dap4shared.RequestMode;
-import dap4.test.servlet.*;
-import dap4.test.util.DapTestCommon;
-import dap4.test.util.Dump;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * TestServlet test server side
  * constraint processing.
  */
+
 
 public class TestServletConstraints extends DapTestCommon
 {
@@ -32,7 +36,7 @@ public class TestServletConstraints extends DapTestCommon
 
 
     // constants for Fake Request
-    static String FAKEURLPREFIX = "http://localhost:8080/d4ts";
+    static String FAKEURLPREFIX = "http://localhost:8080/dap4";
 
     static final BigInteger MASK = new BigInteger("FFFFFFFFFFFFFFFF", 16);
 
@@ -57,6 +61,11 @@ public class TestServletConstraints extends DapTestCommon
 
         static {
             alltests = new ConstraintTest[2048];
+            reset();
+        }
+
+        static public void reset()
+        {
             Arrays.fill(alltests, null);
         }
 
@@ -94,18 +103,15 @@ public class TestServletConstraints extends DapTestCommon
             this.xfail = xfail;
             this.extensions = extensions.split(",");
             this.template = template;
-            this.testinputpath
-                    = this.inputroot + "/" + dataset + "." + id;
-            this.baselinepath
-                    = this.baselineroot + "/" + dataset + "." + id;
-            this.generatepath
-                    = this.generateroot + "/" + dataset + "." + id;
+            this.testinputpath = canonjoin(this.inputroot, dataset) + "." + id;
+            this.baselinepath = canonjoin(this.baselineroot, dataset) + "." + id;
+            this.generatepath = canonjoin(this.generateroot, dataset) + "." + id;
             alltests[id] = this;
         }
 
         String makeurl(RequestMode ext)
         {
-            String url = FAKEURLPREFIX + "/" + dataset;
+            String url = canonjoin(FAKEURLPREFIX, canonjoin(TESTINPUTDIR, dataset));
             if(ext != null) url += "." + ext.toString();
             if(constraint != null) {
                 url += "?" + CONSTRAINTTAG + "=";
@@ -136,22 +142,12 @@ public class TestServletConstraints extends DapTestCommon
     String wardir = null;
 
     //////////////////////////////////////////////////
-    // Constructor(s)
 
-    public TestServletConstraints()
-    {
-        this("TestServletConstraints");
-    }
-
-    public TestServletConstraints(String name)
-    {
-        this(name, null);
-    }
-
-    public TestServletConstraints(String name, String[] argv)
-    {
-        super(name);
-        ConstraintTest.setRoots(getResourceDir() + "/" + TESTINPUTDIR, getResourceDir() + BASELINEDIR, getResourceDir() + GENERATEDIR);
+    @Before
+    public void setup() {
+        ConstraintTest.setRoots(canonjoin(getResourceDir(), TESTINPUTDIR),
+                canonjoin(getResourceDir(), BASELINEDIR),
+                canonjoin(getResourceDir(), GENERATEDIR));
         defineAllTestcases();
         chooseTestcases();
     }
@@ -173,6 +169,7 @@ public class TestServletConstraints extends DapTestCommon
 
     void defineAllTestcases()
     {
+        ConstraintTest.reset();
         this.alltestcases.add(
                 new ConstraintTest(1, "test_one_vararray.nc", "dmr,dap", "/t[1]",
                         // S4
@@ -301,7 +298,7 @@ public class TestServletConstraints extends DapTestCommon
 
     //////////////////////////////////////////////////
     // Junit test methods
-
+    @Test
     public void testServletConstraints()
             throws Exception
     {
@@ -310,7 +307,7 @@ public class TestServletConstraints extends DapTestCommon
             if(!doOneTest(testcase))
                 pass = false;
         }
-        assertTrue("***Fail: TestServletConstraints", pass);
+        Assert.assertTrue("***Fail: TestServletConstraints", pass);
     }
 
     //////////////////////////////////////////////////
@@ -335,7 +332,11 @@ public class TestServletConstraints extends DapTestCommon
                 assert (false);
                 if(!pass) break;
             }
-            if(!pass) break;
+            if(!pass) {
+                System.err.printf("TestServletConstraint: fail: %s ext=%s\n", testcase, extension);
+                System.err.flush();
+                break;
+            }
         }
         return pass;
     }
@@ -346,29 +347,20 @@ public class TestServletConstraints extends DapTestCommon
     {
         boolean pass = true;
         String url = testcase.makeurl(RequestMode.DMR);
-
         // Create request and response objects
-        FakeServlet servlet = new FakeServlet(this.webapproot);
-        FakeServletRequest req = new FakeServletRequest(url, servlet);
-        FakeServletResponse resp = new FakeServletResponse();
-
-        servlet.init();
+        Mocker mocker = new Mocker("dap4",url,this);
+        byte[] byteresult = null;
 
         // See if the servlet can process this
         try {
-            servlet.doGet(req, resp);
+            byteresult = mocker.execute();
         } catch (Throwable t) {
             System.out.println(testcase.xfail ? "XFail" : "Fail");
             t.printStackTrace();
             return testcase.xfail;
         }
 
-        // Collect the output
-        FakeServletOutputStream fakestream = (FakeServletOutputStream) resp.getOutputStream();
-        byte[] byteresult = fakestream.toArray();
-
         // Test by converting the raw output to a string
-
         String sdmr = new String(byteresult, UTF8);
         if(prop_visual)
             visual(url, sdmr);
@@ -392,26 +384,16 @@ public class TestServletConstraints extends DapTestCommon
         String baseline;
         RequestMode mode = RequestMode.DAP;
         String methodurl = testcase.makeurl(mode);
-
         // Create request and response objects
-        FakeServlet servlet = new FakeServlet(this.webapproot);
-        FakeServletRequest req = new FakeServletRequest(methodurl, servlet);
-        FakeServletResponse resp = new FakeServletResponse();
+        Mocker mocker = new Mocker("dap4",methodurl,this);
+        byte[] byteresult = null;
 
-        servlet.init();
-
-        // See if the servlet can process this
         try {
-            servlet.doGet(req, resp);
+            byteresult = mocker.execute();
         } catch (Throwable t) {
             t.printStackTrace();
             return false;
         }
-
-        // Collect the output
-        FakeServletOutputStream fakestream
-                = (FakeServletOutputStream) resp.getOutputStream();
-        byte[] byteresult = fakestream.toArray();
         if(DEBUG) {
             DapDump.dumpbytes(ByteBuffer.wrap(byteresult).order(ByteOrder.nativeOrder()), true);
         }

@@ -4,10 +4,8 @@
 
 package ucar.nc2.util;
 
-import junit.framework.TestCase;
 import ucar.httpservices.HTTPFactory;
 import ucar.httpservices.HTTPMethod;
-import ucar.httpservices.HTTPSession;
 import ucar.nc2.NetcdfFile;
 import ucar.nc2.dataset.NetcdfDataset;
 import ucar.unidata.test.Diff;
@@ -15,16 +13,17 @@ import ucar.unidata.test.util.TestDir;
 
 import java.io.*;
 import java.nio.charset.Charset;
-import java.util.*;
+import java.util.EnumSet;
+import java.util.Set;
 
-public class UnitTestCommon extends TestCase
+public class UnitTestCommon
 {
     //////////////////////////////////////////////////
     // Static Constants
 
-    static final boolean DEBUG = false;
+    static public final boolean DEBUG = false;
 
-    static protected final Charset UTF8 = Charset.forName("UTF-8");
+    static public final Charset UTF8 = Charset.forName("UTF-8");
 
     // Look for these to verify we have found the thredds root
     static final String[] DEFAULTSUBDIRS = new String[]{"httpservices", "cdm", "tds", "opendap", "dap4"};
@@ -135,7 +134,6 @@ public class UnitTestCommon extends TestCase
 
     public UnitTestCommon(String name)
     {
-        super(name);
         this.name = name;
         setSystemProperties();
         initPaths();
@@ -151,7 +149,7 @@ public class UnitTestCommon extends TestCase
         if(DEBUG) {
             System.err.println("UnitTestCommon: dtsServer=" + dtsServer);
         }
-        this.threddsServer = TestDir.threddsTestServer;
+        this.threddsServer = TestDir.remoteTestServer;
         if(DEBUG) {
             System.err.println("UnitTestCommon: threddsServer=" + threddsServer);
         }
@@ -199,22 +197,37 @@ public class UnitTestCommon extends TestCase
         return this.threddsroot;
     }
 
+    public String getName()
+    {
+        return this.name;
+    }
+
     //////////////////////////////////////////////////
     // Instance Utilities
 
     public void
     visual(String header, String captured)
     {
+        visual(header, captured, '-');
+    }
+
+    public void
+    visual(String header, String captured, char marker)
+    {
         if(!captured.endsWith("\n"))
             captured = captured + "\n";
         // Dump the output for visual comparison
         System.out.println("Testing " + getName() + ": " + header + ":");
-        System.out.println("---------------");
+        StringBuilder sep = new StringBuilder();
+        for(int i = 0; i < 10; i++) {
+            sep.append(marker);
+        }
+        System.out.println(sep.toString());
         System.out.print(captured);
-        System.out.println("---------------");
+        System.out.println(sep.toString());
     }
 
-    public String compare(String tag, String baseline, String s)
+    static public String compare(String tag, String baseline, String s)
     {
         try {
             // Diff the two print results
@@ -245,20 +258,15 @@ public class UnitTestCommon extends TestCase
     checkServer(String candidate)
     {
         if(candidate == null) return false;
-/* requires httpclient4
-        int savecount = HTTPSession.getRetryCount();
-        HTTPSession.setRetryCount(1);
-*/
-        // See if the sourceurl is available by trying to get the DSR
+        // ping to see if we get a response
         System.err.print("Checking for sourceurl: " + candidate);
         try {
-            HTTPSession session = new HTTPSession(candidate);
-            HTTPMethod method = HTTPFactory.Get(session);
-            method.execute();
-            String s = method.getResponseAsString();
-            session.close();
-            System.err.println(" ; found");
-            return true;
+            try (HTTPMethod method = HTTPFactory.Get(candidate)) {
+                method.execute();
+                String s = method.getResponseAsString();
+                System.err.println(" ; found");
+                return true;
+            }
         } catch (IOException ie) {
             System.err.println(" ; fail");
             return false;
@@ -400,5 +408,6 @@ public class UnitTestCommon extends TestCase
         sw.close();
         return sw.toString();
     }
+
 }
 

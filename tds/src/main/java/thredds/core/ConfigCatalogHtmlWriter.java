@@ -38,6 +38,7 @@ import thredds.client.catalog.*;
 import thredds.client.catalog.writer.DatasetHtmlWriter;
 import thredds.server.config.HtmlConfig;
 import thredds.servlet.HtmlWriter;
+import static thredds.servlet.ServletUtil.setResponseContentLength;
 import thredds.util.ContentType;
 import ucar.nc2.units.DateType;
 import ucar.unidata.util.Format;
@@ -87,15 +88,18 @@ public class ConfigCatalogHtmlWriter {
   public int writeCatalog(HttpServletRequest req, HttpServletResponse res, Catalog cat, boolean isLocalCatalog) throws IOException {
     String catHtmlAsString = convertCatalogToHtml(cat, isLocalCatalog);
 
-    res.setContentLength(catHtmlAsString.length());
+    // Once this header is set, we know the encoding, and thus the actual
+    // number of *bytes*, not characters, to encode
     res.setContentType(ContentType.html.getContentHeader());
+    int len = setResponseContentLength(res, catHtmlAsString);
+
     if (!req.getMethod().equals("HEAD")) {
       PrintWriter writer = res.getWriter();
       writer.write(catHtmlAsString);
       writer.flush();
     }
 
-    return catHtmlAsString.length();
+    return len;
   }
 
   /**
@@ -256,7 +260,7 @@ public class ConfigCatalogHtmlWriter {
                   .append("' alt='").append(htmlConfig.getFolderIconAlt()).append("'> &nbsp;");
 
         // Check if dataset has single resolver service.
-        if (ds.getAccess().size() == 1 && (ds.getAccess().get(0)).getService().getType().equals(ServiceType.Resolver)) {
+        if (ds.getAccess().size() == 1 && ServiceType.Resolver == ds.getAccess().get(0).getService().getType()) {
           Access access = ds.getAccess().get(0);
           String accessUrlName = access.getUnresolvedUrlName();
           int pos = accessUrlName.lastIndexOf(".xml");

@@ -33,19 +33,23 @@
 
 package thredds.motherlode;
 
-import org.junit.Test;
-import ucar.nc2.util.IO;
-
 import java.io.IOException;
+
+import org.junit.Test;
+import org.junit.experimental.categories.Category;
+import ucar.nc2.util.IO;
+import ucar.unidata.test.util.NeedsExternalResource;
+import ucar.unidata.test.util.TestDir;
 
 /**
  * Run sanity check on motherlode
  *
  * @author caron
  */
+@Category(NeedsExternalResource.class)
 public class TestMotherlodePing {
 
-  public static String server = "http://thredds-test.ucar.edu/thredds";
+  public static String server = "http://"+TestDir.threddsTestServer+"/thredds";
 
   static void ping(String url) {
     try {
@@ -66,6 +70,4 @@ public class TestMotherlodePing {
     ping("/wms/grib/NCEP/GFS/Global_2p5deg/best?REQUEST=GetCapabilities&VERSION=1.3.0&SERVICE=WMS");
     ping("/radarServer/nexrad/level3/IDD?north=50.00&south=20.00&west=-127&east=-66&time=present&var=NST");
   }
-
-
 }

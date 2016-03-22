@@ -1,91 +1,71 @@
 allprojects {
+    // Matches Maven's "project.groupId". Used in MANIFEST.MF for "Implementation-Vendor-Id".
     group = "edu.ucar"
-    version = '4.6.0-SNAPSHOT'
+    // Matches Maven's "project.version". Used in MANIFEST.MF for "Implementation-Version".
+    version = '4.6.5-SNAPSHOT'
+    // Eventually, we'll stop appending "SNAPSHOT" to our versions and just use this.
+    status = 'development'
 }
 
-subprojects {
-    apply plugin: 'java'
+// Matches Maven's "project.description".
+description = "The Unidata THREDDS project includes the netCDF-Java library (aka CDM) " +
+        "and the THREDDS Data Server (TDS)."
 
-    sourceCompatibility = 1.7
-    targetCompatibility = 1.7
+import java.text.SimpleDateFormat
 
-    // Unlike Maven, Gradle places CLASS files and resources in different directories by default.
-    // This is a problem for IntelliJ: when running an application from the IDE, it expects everything to be in the
-    // same directory. To fix, we're configuring resources to be copied to the same directory as CLASS files.
-    processResources.destinationDir = compileJava.destinationDir
+// These will be inherited by subprojects: http://goo.gl/5mvqf7
+// After declaration, they should NOT be referred to using the "ext" namespace, instead preferring e.g.
+// "project.title" or simply "title": http://stackoverflow.com/questions/14530901
+// That way, the property will be robustly resolved, as described here: http://goo.gl/UBq0en
+// Otherwise, only the one specific ExtraPropertiesExtension will be searched.
+ext {
+    // Matches Maven's "project.name". Used in MANIFEST.MF for "Implementation-Title".
+    title = "Parent THREDDS and CDM modules"
 
-    // TODO: Add to dependencies.gradle.
+    // Matches Maven's "project.organization.name". Used in MANIFEST.MF for "Implementation-Vendor".
+    vendor = "UCAR/Unidata"
+
+    // Matches Maven's "project.url". Used in MANIFEST.MF for "Implementation-URL".
+    url = "http://www.unidata.ucar.edu/software/thredds/current/netcdf-java/documentation.htm"
+
+    SimpleDateFormat iso_8601_format = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ")
+    buildTimestamp = iso_8601_format.format(new Date())
+
+    // Project groups:
+    nonJavaProjects = allprojects.findAll { it.path in [ ':', ':dap4', ':ncIdv' ] }
+    javaProjects = allprojects - nonJavaProjects
+
+    internalProjects = allprojects.findAll { it.path in [
+            ':dap4', ':dap4:d4tests', ':dap4:d4ts', ':dap4:d4tswar', ':opendap:dtswar',
+            ':ncIdv', ':it', ':cdm-test',
+    ] }
+    publishedProjects = allprojects - internalProjects      // Includes root project.
+}
+
+// Due to a Gradle limitation, we cannot externalize this buildscript block into a script plugin. However, we can
+// exploit the fact that dependencies specified in a parent's buildscript block are visible to all children.
+// Thus, as long as we declare all plugins here, no child needs its own buildscript block. See http://goo.gl/2y3KhZ.
+buildscript {
+    apply from: "$rootDir/gradle/dependencies.gradle"
+
     repositories {
-        mavenCentral()
-        maven {
-            url "https://artifacts.unidata.ucar.edu/content/repositories/unidata"
-        }
-        maven {
-            url "https://artifacts.unidata.ucar.edu/content/repositories/unidata-3rdparty/"
-        }
+        jcenter()
     }
-
-    // TODO: Only cdm, ncIdv, tdm, ui, and visad use the shadow plugin, so we shouldn't be adding it as
-    // a buildscript-dependency to all subprojects. We should break out the common stuff to /gradle/shadow.gradle
-    // and then apply that script only to those 5.
-    buildscript {
-        repositories {
-            jcenter()
-        }
-        dependencies {
-            // Also, this needs to be declared in /gradle/dependencies.gradle
-            classpath 'com.github.jengelman.gradle.plugins:shadow:0.8'
-        }
-    }
-
-    // Will apply to "compileJava", "compileTestJava", "compileSourceSetJava", etc.
-    tasks.withType(JavaCompile) {
-        options.encoding = 'UTF-8'
-
-        // Disable warnings about cross-compilation:
-        // http://docs.oracle.com/javase/8/docs/technotes/tools/windows/javac.html#BHCIJIEG
-        // This is usually fine, but see: http://www.draconianoverlord.com/2014/04/01/jdk-compatibility.html
-        // To be safe, we should make sure that our production releases are built
-        // on a machine running the same version of the JVM as our project language level.
-        options.compilerArgs = ['-Xlint:-options']
-    }
-
-    // FIXME: Extend these to all Jar subtypes (e.g. War)?
-    //Could I then add additional attributes in subproject build scripts?
-    jar {
-        manifest {
-            attributes 'Implementation-Title': project.name,
-                    'Implementation-Version': project.version,
-                    'Implementation-Vendor-Id': project.group,
-                    'Implementation-Vendor': 'UCAR/Unidata',
-                    // Commented out to avoid unnecessary re-compilation and re-jarring: http://goo.gl/kbVWXR
-                    // I think I can fix this by writing a builtOn.txt file in compileJava,
-                    // and then reading in its value here.
-                    // 'Built-On': new Date(),
-                    'Build-Jdk': JavaVersion.current(),
-                    'Codebase': 'http://www.unidata.ucar.edu/software/thredds/',
-                    'Permissions': 'all-permissions',
-                    'Trusted-Only': 'true'
-        }
-    }
-
-    tasks.withType(Javadoc) {
-        options.encoding = 'UTF-8'
-
-        if (JavaVersion.current().isJava8Compatible()) {
-            // See http://blog.joda.org/2014/02/turning-off-doclint-in-jdk-8-javadoc.html
-            options.addStringOption('Xdoclint:none', '-quiet')
-        }
+    dependencies {
+        classpath libraries["gretty"]
+        classpath libraries["shadow"]
+        classpath libraries["coveralls-gradle-plugin"]
+        classpath libraries["gradle-extra-configurations-plugin"]
     }
 }
 
-// Pulls contents into this script. Subprojects inherit the properties and methods defined by their parent.
-apply from: "gradle/dependencies.gradle"
+apply from: "$rootDir/gradle/dependencies.gradle"
 
-apply from: "gradle/testing.gradle"
+apply from: "$rootDir/gradle/testing.gradle"
+apply from: "$rootDir/gradle/java.gradle"
+apply from: "$rootDir/gradle/coverage.gradle"
+apply from: "$rootDir/gradle/archiving.gradle"
 
-apply from: "gradle/publishing.gradle"
-
-task wrapper(type: Wrapper) {
-    gradleVersion = '2.2.1'
-}
+// Order dependency: publishing.gradle creates publications for artifacts created in fatJars.gradle.
+apply from: "$rootDir/gradle/fatJars.gradle"
+apply from: "$rootDir/gradle/publishing.gradle"

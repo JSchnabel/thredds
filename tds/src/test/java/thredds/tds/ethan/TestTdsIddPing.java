@@ -32,8 +32,11 @@
  */
 package thredds.tds.ethan;
 
-import junit.framework.*;
+import junit.framework.TestCase;
+import org.junit.experimental.categories.Category;
 import thredds.client.catalog.Catalog;
+import ucar.unidata.test.util.NeedsExternalResource;
+import ucar.unidata.test.util.TestDir;
 
 /**
  * _more_
@@ -41,10 +44,11 @@ import thredds.client.catalog.Catalog;
  * @author edavis
  * @since Nov 30, 2006 11:13:36 AM
  */
+@Category(NeedsExternalResource.class)
 public class TestTdsIddPing extends TestCase
 {
 
-  private String host = "thredds.ucar.edu";
+  private String host = TestDir.threddsTestServer;
   private String targetTdsUrl;
 
   public TestTdsIddPing( String name )
@@ -52,10 +56,10 @@ public class TestTdsIddPing extends TestCase
     super( name );
   }
 
+  @Override
   protected void setUp()
   {
     host = System.getProperty( "thredds.tds.test.server", host );
-
     targetTdsUrl = "http://" + host + "/thredds/";
   }
 

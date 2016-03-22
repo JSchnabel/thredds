@@ -8,7 +8,7 @@ import org.springframework.core.io.Resource;
 import thredds.client.catalog.Catalog;
 import thredds.featurecollection.FeatureCollectionConfig;
 import thredds.inventory.CollectionSpecParser;
-import thredds.server.catalog.builder.FeatureCollectionConfigBuilder;
+import thredds.featurecollection.FeatureCollectionConfigBuilder;
 import thredds.util.AliasHandler;
 
 import java.io.File;
@@ -82,9 +82,10 @@ public class CatalogConfigReader {
           if (!configBuilder.fatalError) {
             name = config.collectionName;
 
-            // check spec
-            config.spec = aliasHandler.replaceAlias(config.spec);
-            CollectionSpecParser specp = new CollectionSpecParser(config.spec, errlog);
+            // check root dir exists
+            if (config.spec != null)
+              config.spec = aliasHandler.replaceAlias(config.spec);
+            CollectionSpecParser specp = config.getCollectionSpecParser(errlog);
             Path rootPath = Paths.get(specp.getRootDir());
             if (!Files.exists(rootPath)) {
               System.out.printf("Root path %s does not exist fc='%s' from catalog=%s %n", rootPath.getFileName(), config.collectionName, catFile.getPath());

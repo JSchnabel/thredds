@@ -36,6 +36,9 @@
 
 package ucar.nc2.iosp.cinrad;
 
+import org.joda.time.DateTime;
+import ucar.nc2.time.CalendarDate;
+import ucar.nc2.time.CalendarDateUnit;
 import ucar.unidata.io.RandomAccessFile;
 import ucar.ma2.IndexIterator;
 import ucar.ma2.Range;
@@ -110,20 +113,20 @@ public class Cinrad2Record {
     }
   } */
 
-  public static final byte MISSING_DATA = (byte) 1;
+  public static byte MISSING_DATA = (byte) 1;
   public static final byte BELOW_THRESHOLD = (byte) 0;
 
   /** Size of the file header, aka title */
-  static final int FILE_HEADER_SIZE = 0;
+  static int FILE_HEADER_SIZE = 0;
 
   /** Size of the CTM record header */
-  private static final int CTM_HEADER_SIZE = 14;
+  private static int CTM_HEADER_SIZE = 14;
 
   /** Size of the the message header, to start of the data message */
   private static final int MESSAGE_HEADER_SIZE = 28;
 
   /** Size of the entire message, if its a radar data message */
-  private static final int RADAR_DATA_SIZE = 2432;
+  private static int RADAR_DATA_SIZE = 2432;
 
   static public String getDatatypeName( int datatype) {
     switch (datatype) {
@@ -150,20 +153,64 @@ public class Cinrad2Record {
 
   static public float getDatatypeScaleFactor(int datatype) {
     switch (datatype) {
-      case REFLECTIVITY: return 0.5f;
-      case VELOCITY_LOW : return 1.0f;
+      case REFLECTIVITY:
+        if(Cinrad2IOServiceProvider.isCC)
+          return 0.1f;
+        if(Cinrad2IOServiceProvider.isCC20)
+          return 0.5f;
+        else
+          return 0.5f;
+      case VELOCITY_LOW :
+        if(Cinrad2IOServiceProvider.isSC)
+          return 0.3673f;
+        else if(Cinrad2IOServiceProvider.isCC)
+          return 0.1f;
+        else
+          return 1.0f;
       case VELOCITY_HI:
-      case SPECTRUM_WIDTH : return 0.5f;
+      case SPECTRUM_WIDTH :
+        if(Cinrad2IOServiceProvider.isSC)
+          return 0.1822f;
+        else if(Cinrad2IOServiceProvider.isCC)
+          return 0.1f;
+        else if(Cinrad2IOServiceProvider.isCC20)
+          return 1.0f;
+        else
+          return 0.5f;
       default : throw new IllegalArgumentException();
     }
   }
 
   static public float getDatatypeAddOffset(int datatype) {
     switch (datatype) {
-      case REFLECTIVITY : return -33.0f;
-      case VELOCITY_LOW : return -129.0f;
+      case REFLECTIVITY :
+        if(Cinrad2IOServiceProvider.isSC)
+          return -32.0f;
+        else if (Cinrad2IOServiceProvider.isCC)
+          return 0.0f;
+        else if (Cinrad2IOServiceProvider.isCC20)
+          return -32.0f;
+        else
+          return -33.0f;
+      case VELOCITY_LOW :
+        if(Cinrad2IOServiceProvider.isSC)
+          return 0.0f;
+        else if(Cinrad2IOServiceProvider.isCC)
+          return 0.0f;
+        else if (Cinrad2IOServiceProvider.isCC20)
+          return 0.0f;
+        else
+          return -129.0f;
       case VELOCITY_HI:
-      case SPECTRUM_WIDTH : return -64.5f;
+      case SPECTRUM_WIDTH :
+          if(Cinrad2IOServiceProvider.isSC)
+            return 0.0f;
+          else if(Cinrad2IOServiceProvider.isCC)
+            return 0.0f;
+          else if (Cinrad2IOServiceProvider.isCC20)
+            return 0.0f;
+          else
+            return -64.5f;
       default : throw new IllegalArgumentException();
     }
   }
@@ -241,9 +288,11 @@ public class Cinrad2Record {
   short data_julian_date = 0;
   short unamb_range = 0;
   int azimuth_ang = 0;
+  int azimuth_ang_end = 0;
   short radial_num = 0; // radial number within the elevation : starts with one
   short radial_status = 0;
   short elevation_ang = 0;
+  short elevation_ang_end = 0;
   short elevation_num = 0;
 
   short reflect_first_gate = 0; // distance to first reflectivity gate (m)
@@ -267,6 +316,9 @@ public class Cinrad2Record {
   private short velocity_offset; // velocity data pointer (byte number from start of message)
   private short spectWidth_offset; // spectrum-width data pointer (byte number from start of message)
 
+  public DateTime dateTime0;
+  public DateTime dateTimeE;
+  public SweepInfo [] sweepInfo;
   public static Cinrad2Record factory(RandomAccessFile din, int record) throws IOException {
     long offset = (long)record * RADAR_DATA_SIZE + FILE_HEADER_SIZE;
     if (offset >= din.length())
@@ -274,103 +326,476 @@ public class Cinrad2Record {
     else
       return new Cinrad2Record(din, record);
   }
-    int getUInt( byte[] b, int num )
-  {
-      int            base=1;
-      int            i;
-      int            word=0;
 
-      int bv[] = new int[num];
 
-      for (i = 0; i<num; i++ )
-      {
-        bv[i] = convertunsignedByte2Short(b[i]);
-      }
+  public short convertunsignedByte2Short(byte b) {
+      return (short)((b<0)? (short)b + 256 : (short)b);
+   }
 
-      /*
-      ** Calculate the integer value of the byte sequence
-      */
+  public void readSCHeader(RandomAccessFile din) throws IOException {
 
-      for ( i = num-1; i >= 0; i-- ) {
-        word += base * b[i];
-        base *= 256;
-      }
+    message_offset = 0;
+    din.seek(message_offset);
+// site info 170
+    din.skipBytes(90);
+    byte[] b10 = new byte[10];
+    // Message Header
+    din.read(b10);
+    String stationNId = new String(b10);
 
-      return word;
+    din.skipBytes(52);
+
+    // latlon
+    int lon = din.readInt();
+    int lat = din.readInt();
+    int hhh = din.readInt();
+
+    din.skipBytes(6);
+    //
+    message_type = 1;
+
+    //PerformanceInfo
+    din.skipBytes(31);
+
+    //ObservationInfo
+    vcp = convertunsignedByte2Short(din.readByte());
+    short syear = (short)din.readUnsignedShort();
+    short smm = convertunsignedByte2Short(din.readByte());
+    short sdd = convertunsignedByte2Short(din.readByte());
+    short shh = convertunsignedByte2Short(din.readByte());
+    short smi = convertunsignedByte2Short(din.readByte());
+    short sss = convertunsignedByte2Short(din.readByte());
+
+    dateTime0 = new DateTime(syear,smm,sdd,shh,smi,sss);
+
+    din.skipBytes(8);
+    long offset = din.getFilePointer();
+    sweepInfo = new SweepInfo[30];
+    for(int i = 0; i < 30; i++){
+      sweepInfo[i] = new SweepInfo(din, (int)offset);
+      offset = offset + 21;
+    }
+
+    din.skipBytes(6);
+
+    syear = (short)din.readUnsignedShort();
+    smm = convertunsignedByte2Short(din.readByte());
+    sdd = convertunsignedByte2Short(din.readByte());
+    shh = convertunsignedByte2Short(din.readByte());
+    smi = convertunsignedByte2Short(din.readByte());
+    sss = convertunsignedByte2Short(din.readByte());
+
+    dateTimeE = new DateTime(syear,smm,sdd,shh,smi,sss);
+
   }
-    public short convertunsignedByte2Short(byte b)
-     {
-        return (short)((b<0)? (short)b + 256 : (short)b);
-     }
+
+  int sweepN = 1;
+  int echoType;
+  int [] elev;
+  int [] recordNum;
+  byte cDataForm;
+  public void readCCHeader(RandomAccessFile din) throws IOException {
+
+    message_offset = 0;
+    din.seek(message_offset);
+// site info 170
+    din.skipBytes(66);
+
+    // Message Header
+    String stationId = din.readString(40);
+    String stationNbr = din.readString(10);
+
+    din.skipBytes(20);
+
+    String clon = din.readString(16);
+    String clat = din.readString(16);
+    // latlon
+    int lon = (int)din.readInt();
+    int lat = (int)din.readInt();
+    int hhh = (int)din.readInt();
+
+    din.skipBytes(4);
+
+    //ObservationInfo
+
+    short syear1 = convertunsignedByte2Short(din.readByte());
+    short syear2 = convertunsignedByte2Short(din.readByte());
+    short syear = (short)(syear1 * 100 + syear2);
+    short smm = convertunsignedByte2Short(din.readByte());
+    short sdd = convertunsignedByte2Short(din.readByte());
+    short shh = convertunsignedByte2Short(din.readByte());
+    short smi = convertunsignedByte2Short(din.readByte());
+    short sss = convertunsignedByte2Short(din.readByte());
+
+    dateTime0 = new DateTime(syear,smm,sdd,shh,smi,sss);
+
+    din.skipBytes(1);
+
+    syear1 = convertunsignedByte2Short(din.readByte());
+    syear2 = convertunsignedByte2Short(din.readByte());
+    syear = (short)(syear1 * 100 + syear2);
+    smm = convertunsignedByte2Short(din.readByte());
+    sdd = convertunsignedByte2Short(din.readByte());
+    shh = convertunsignedByte2Short(din.readByte());
+    smi = convertunsignedByte2Short(din.readByte());
+    sss = convertunsignedByte2Short(din.readByte());
+
+    dateTimeE = new DateTime(syear,smm,sdd,shh,smi,sss);
+    short scanMode = convertunsignedByte2Short(din.readByte());
+    if(scanMode == 10) {
+      sweepN = 1;
+    } else if(scanMode >= 100){
+      sweepN = scanMode - 100;
+    } else {
+      throw new IOException("Error reading CINRAD CC data: Unsupported product: RHI/FFT");
+    }
+
+    elev = new int[sweepN];
+    din.skipBytes(4);
+    short sRHIA= (short)din.readUnsignedShort();
+
+    din.skipBytes(4);
+
+    echoType = din.readUnsignedShort();
+    if(echoType != 0x408a) //only support vppi at this moment
+      throw new IOException("Error reading CINRAD CC data: Unsupported level 2 data");
+
+    int prodCode = din.readUnsignedShort();
+
+    if(prodCode != 0x8003) //only support vppi at this moment
+      throw new IOException("Error reading CINRAD CC data: Unsupported product: RHI/FFT");
+    din.skipBytes(4);
+
+    //remain2[660]
+    for(int i = 0; i < sweepN; i++) {
+      int maxV =  din.readUnsignedShort();
+      int maxL =  din.readUnsignedShort();
+      int binWidth =  din.readUnsignedShort();
+      int binNum =   din.readUnsignedShort();
+      int recordTotalNum = din.readUnsignedShort();
+      din.skipBytes(8);
+      elev[i] = din.readUnsignedShort();
+      din.skipBytes(2);
+      //System.out.println("bin num: " + binNum + " maxL " + maxL + " totalRNumber " + recordTotalNum);
+    }
+    //din.seek(1020);
+   // int doffset = din.readInt();
+    //System.out.println(" Offset: " + doffset);
+  }
+
+  public void readCC20Header(RandomAccessFile din) throws IOException {
+
+    message_offset = 0;
+    din.seek(message_offset);
+// site info 170
+    din.skipBytes(62);
+
+    // Message Header
+    String stationId = din.readString(40);
+    String stationNbr = din.readString(10);
+
+    din.skipBytes(20);
+
+    String clon = din.readString(16);
+    String clat = din.readString(16);
+    // latlon
+    int lon = (int)din.readInt();
+    int lat = (int)din.readInt();
+    int hhh = (int)din.readInt();
+
+    din.skipBytes(40);
+
+    //ObservationInfo
+    short scanMode = convertunsignedByte2Short(din.readByte());
+    if(scanMode == 10) {
+      sweepN = 1;
+    } else if(scanMode >= 100){
+      sweepN = scanMode - 100;
+    } else {
+      throw new IOException("Error reading CINRAD CC data: Unsupported product: RHI/FFT");
+    }
+
+    short syear = (short)din.readUnsignedShort();
+    short smm = convertunsignedByte2Short(din.readByte());
+    short sdd = convertunsignedByte2Short(din.readByte());
+    short shh = convertunsignedByte2Short(din.readByte());
+    short smi = convertunsignedByte2Short(din.readByte());
+    short sss = convertunsignedByte2Short(din.readByte());
+
+    dateTime0 = new DateTime(syear,smm,sdd,shh,smi,sss);
+
+    din.skipBytes(14); // 14+ (35 - 21)
+
+    //remain2[660]
+    elev = new int[sweepN];
+    recordNum = new int[sweepN];
+    for(int i = 0; i < sweepN; i++) {
+      din.skipBytes(14);
+      int zbinWidth =  din.readUnsignedShort();
+      int vbinWidth =  din.readUnsignedShort();
+      int sbinWidth =  din.readUnsignedShort();
+      int zbinNum =   din.readUnsignedShort();
+      int vbinNum =   din.readUnsignedShort();
+      int sbinNum =   din.readUnsignedShort();
+      recordNum[i] = din.readUnsignedShort();
+      //if(i > 0)
+      //  recordNum[i] = recordNum[i] + recordNum[i-1];
+      elev[i] = din.readShort();
+      cDataForm = din.readByte();
+      if(cDataForm != 22 && cDataForm != 23 && cDataForm != 24)
+        throw new IOException("Unsupported CC data format");
+      int dataP = din.readInt();
+      //din.skipBytes(2);
+      //System.out.println("zbin num: " + zbinNum + " vbin num: " + vbinNum + " sbin num: " + sbinNum + " dataForm " + cDataForm);
+    }
+
+    for(int i = sweepN; i < 32; i++) {
+      din.skipBytes(35);
+    }
+
+    din.skipBytes(6);
+
+    syear = (short)din.readUnsignedShort();
+    smm = convertunsignedByte2Short(din.readByte());
+    sdd = convertunsignedByte2Short(din.readByte());
+    shh = convertunsignedByte2Short(din.readByte());
+    smi = convertunsignedByte2Short(din.readByte());
+    sss = convertunsignedByte2Short(din.readByte());
+
+    dateTimeE = new DateTime(syear,smm,sdd,shh,smi,sss);
+
+  }
+
 
   public Cinrad2Record(RandomAccessFile din, int record) throws IOException {
+    if(!Cinrad2IOServiceProvider.isSC && !Cinrad2IOServiceProvider.isCC
+            && !Cinrad2IOServiceProvider.isCC20) {
+      //CINRAD SA/SB
+      this.recno = record;
+      message_offset = (long) record * RADAR_DATA_SIZE + FILE_HEADER_SIZE;
 
-    this.recno = record;
-    message_offset = (long)record * RADAR_DATA_SIZE + FILE_HEADER_SIZE;
-    din.seek(message_offset);
+      din.seek(message_offset);
 
-    din.skipBytes(CTM_HEADER_SIZE);
-    //byte[] b2 = new byte[2];
-    // Message Header
-     //din.read(b2);
-    //
-    // b2[0] = din.readByte();
-    //  b2[1] = din.readByte();
-    //  message_size = (short)getUInt(b2, 2);
-    //message_size  = (short)din.readShort(); // size in "halfwords" = 2 bytes
+      din.skipBytes(CTM_HEADER_SIZE);
+      //byte[] b2 = new byte[2];
+      // Message Header
+      //din.read(b2);
+      //
+      // b2[0] = din.readByte();
+      //  b2[1] = din.readByte();
+      //  message_size = (short)getUInt(b2, 2);
+      //message_size  = (short)din.readShort(); // size in "halfwords" = 2 bytes
 
-    //id_channel    = din.readByte(); // channel id
-    message_type  = din.readByte();
-    //id_sequence   = din.readShort();
+      //id_channel    = din.readByte(); // channel id
+      message_type = din.readByte();
+      //id_sequence   = din.readShort();
       //skip 2 byte
-     din.skipBytes(13);
-    //mess_msecs    = din.readInt();   // message generation time
-    //mess_julian_date   = din.readShort(); // from 1/1/70; prob "message generation time"
+      din.skipBytes(13);
+      //mess_msecs    = din.readInt();   // message generation time
+      //mess_julian_date   = din.readShort(); // from 1/1/70; prob "message generation time"
 
-    // seg_count     = din.readShort(); // number of message segments
-    //seg_number    = din.readShort(); // this segment
+      // seg_count     = din.readShort(); // number of message segments
+      //seg_number    = din.readShort(); // this segment
 
-    //dumpMessage(System.out, dd);
-    if (message_type != 1) return;
+      //dumpMessage(System.out, dd);
+      if (message_type != 1) return;
 
-    // data header
-    byte[] b4 = din.readBytes(4);
-    data_msecs    = bytesToInt(b4, true); //din.readInt();   // collection time for this radial, msecs since midnight
-    byte[] b2 = din.readBytes(2);
-    data_julian_date  = (short)bytesToShort(b2, true); //din.readShort(); // prob "collection time"
-    unamb_range   = din.readShort(); // unambiguous range
-    azimuth_ang   = din.readUnsignedShort(); // LOOK why unsigned ??
-    radial_num   = din.readShort(); // radial number within the elevation
-    radial_status = din.readShort();
-    elevation_ang = din.readShort();
-    elevation_num = din.readShort(); // RDA elevation number
-    reflect_first_gate = din.readShort(); // range to first gate of reflectivity (m) may be negetive
-    doppler_first_gate = din.readShort(); // range to first gate of dopplar (m) may be negetive
-    reflect_gate_size = din.readShort(); // reflectivity data gate size (m)
-    doppler_gate_size = din.readShort(); // dopplar data gate size (m)
-    reflect_gate_count = din.readShort(); // number of reflectivity gates
-    doppler_gate_count = din.readShort(); // number of velocity or spectrum width gates
+      // data header
+      byte[] b4 = din.readBytes(4);
+      data_msecs = bytesToInt(b4, true); //din.readInt();   // collection time for this radial, msecs since midnight
+      byte[] b2 = din.readBytes(2);
+      data_julian_date = (short) bytesToShort(b2, true); //din.readShort(); // prob "collection time"
+      unamb_range = din.readShort(); // unambiguous range
+      azimuth_ang = din.readUnsignedShort(); // LOOK why unsigned ??
+      radial_num = din.readShort(); // radial number within the elevation
+      radial_status = din.readShort();
+      elevation_ang = din.readShort();
+      elevation_num = din.readShort(); // RDA elevation number
+      reflect_first_gate = din.readShort(); // range to first gate of reflectivity (m) may be negetive
+      doppler_first_gate = din.readShort(); // range to first gate of dopplar (m) may be negetive
+      reflect_gate_size = din.readShort(); // reflectivity data gate size (m)
+      doppler_gate_size = din.readShort(); // dopplar data gate size (m)
+      reflect_gate_count = din.readShort(); // number of reflectivity gates
+      doppler_gate_count = din.readShort(); // number of velocity or spectrum width gates
+      if (record == 0) {
+        if (reflect_gate_count == 1000 && doppler_gate_count == 1000)
+          RADAR_DATA_SIZE = 3132;
+        else if (reflect_gate_count == 800 || doppler_gate_count == 1600)
+          RADAR_DATA_SIZE = 4132;
+        else
+          RADAR_DATA_SIZE = 2432;
+      }
       din.skipBytes(6);
-    //cut           = din.readShort(); // sector number within cut
-    //calibration   = din.readFloat(); // system gain calibration constant (db biased)
-    reflect_offset  = din.readShort(); // reflectivity data pointer (byte number from start of message)
-    velocity_offset   = din.readShort(); // velocity data pointer (byte number from start of message)
-    spectWidth_offset = din.readShort(); // spectrum-width data pointer (byte number from start of message)
-    resolution    = din.readShort(); // dopplar velocity resolution
-    vcp           = din.readShort(); // volume coverage pattern
+      //cut           = din.readShort(); // sector number within cut
+      //calibration   = din.readFloat(); // system gain calibration constant (db biased)
+      reflect_offset = din.readShort(); // reflectivity data pointer (byte number from start of message)
+      velocity_offset = din.readShort(); // velocity data pointer (byte number from start of message)
+      spectWidth_offset = din.readShort(); // spectrum-width data pointer (byte number from start of message)
+      resolution = din.readShort(); // dopplar velocity resolution
+      vcp = din.readShort(); // volume coverage pattern
+      message_type = 1;
+      din.skipBytes(14);
 
-    din.skipBytes(14);
+      nyquist_vel = din.readShort(); // nyquist velocity
+      din.skipBytes(38);
+      //attenuation   = din.readShort(); // atmospheric attenuation factor
+      //threshhold    = din.readShort(); // threshhold paramter for minimum difference
 
-    nyquist_vel   = din.readShort(); // nyquist velocity
-     din.skipBytes(38);
-    //attenuation   = din.readShort(); // atmospheric attenuation factor
-    //threshhold    = din.readShort(); // threshhold paramter for minimum difference
+      hasReflectData = (reflect_gate_count > 0);
+      hasDopplerData = (doppler_gate_count > 0);
+      //  dump(System.out);
+    } else if(Cinrad2IOServiceProvider.isSC) {
+      //CINRAD SC
+      this.recno = record;
+      // read header for every record
+      readSCHeader(din);
+      RADAR_DATA_SIZE = 4000;
+        //FILE_HEADER_SIZE = 1024;
 
-    hasReflectData = (reflect_gate_count > 0);
-    hasDopplerData = (doppler_gate_count > 0);
-    //  dump(System.out);
+      message_offset = (long) record * RADAR_DATA_SIZE + 1024;
+      if (message_offset >= din.length())
+        return;
+      din.seek(message_offset);
+      //System.out.println("record = " + record);
+      azimuth_ang = din.readUnsignedShort(); // LOOK why unsigned ??
+      elevation_ang = (short)din.readUnsignedShort();
+      azimuth_ang_end = din.readUnsignedShort(); // LOOK why unsigned ??
+      elevation_ang_end = (short)din.readUnsignedShort();
+      radial_num = (short)(record % 360 + 1); // radial number within the elevation
+
+      elevation_num =(short)((record/360) + 1); // RDA elevation number
+      reflect_first_gate = 300; // range to first gate of reflectivity (m) may be negetive
+      doppler_first_gate = 300; // range to first gate of dopplar (m) may be negetive
+      reflect_gate_size = 300; // reflectivity data gate size (m)
+      doppler_gate_size = 300; // dopplar data gate size (m)
+      reflect_gate_count = 998; // number of reflectivity gates
+      doppler_gate_count = 998; // number of velocity or spectrum width gates
+      //vcp = sweepInfo[0].svcp;
+      //cut           = din.readShort(); // sector number within cut
+      //calibration   = din.readFloat(); // system gain calibration constant (db biased)
+      reflect_offset =   8; // reflectivity data pointer (byte number from start of message)
+      velocity_offset =  8; // 9 velocity data pointer (byte number from start of message)
+      spectWidth_offset = 8; // 11 spectrum-width data pointer (byte number from start of message)
+      //resolution = din.readShort(); // dopplar velocity resolution
+
+      hasReflectData = (reflect_gate_count > 0);
+      hasDopplerData = (doppler_gate_count > 0);
+    } else if(Cinrad2IOServiceProvider.isCC){
+      //cinrad CC
+      this.recno = record;
+      // read header for every record
+      //if(record == 0)
+        readCCHeader(din);
+      RADAR_DATA_SIZE = 3000;
+      //FILE_HEADER_SIZE = 1021;
+      message_type = 1;
+      message_offset = (long) record * RADAR_DATA_SIZE + 1024;
+      if (message_offset >= din.length())
+        return;
+      din.seek(message_offset);
+      //System.out.println("record = " + record);
+      radial_num = (short)(record % 512 + 1); // radial number within the elevation
+      azimuth_ang = radial_num;
+
+      elevation_num =(short)((record/512) + 1); // RDA elevation number
+      //System.out.println("elevation num: " + elevation_num + " record " + record + " radial " + radial_num);
+      if(elevation_num > sweepN)
+        elevation_num = (short)sweepN;
+      elevation_ang = (short)elev[elevation_num - 1];
+      reflect_first_gate = 300; // range to first gate of reflectivity (m) may be negetive
+      doppler_first_gate = 300; // range to first gate of dopplar (m) may be negetive
+      reflect_gate_size = 150; // reflectivity data gate size (m)
+      doppler_gate_size = 150; // dopplar data gate size (m)
+      reflect_gate_count = 500; // number of reflectivity gates
+      doppler_gate_count = 500; // number of velocity or spectrum width gates
+      //vcp = sweepInfo[0].svcp;
+      //cut           = din.readShort(); // sector number within cut
+      //calibration   = din.readFloat(); // system gain calibration constant (db biased)
+      reflect_offset =   0; // reflectivity data pointer (byte number from start of message)
+      velocity_offset =  1000; // 9 velocity data pointer (byte number from start of message)
+      spectWidth_offset = 2000; // 11 spectrum-width data pointer (byte number from start of message)
+      //resolution = din.readShort(); // dopplar velocity resolution
+
+      hasReflectData = (reflect_gate_count > 0);
+      hasDopplerData = (doppler_gate_count > 0);
+    } else if(Cinrad2IOServiceProvider.isCC20){
+      //cinrad CC
+      this.recno = record;
+      // read header for every record
+      // if(record == 0)
+      readCC20Header(din);
+
+      //if(record > recordNum[recordNum.length-1]-1)
+      //  return;
+      if(cDataForm == 24)
+        RADAR_DATA_SIZE = 4011;
+      else
+        RADAR_DATA_SIZE = 3011;
+      //FILE_HEADER_SIZE = 1021;
+      message_type = 1;
+      message_offset = (long) record * RADAR_DATA_SIZE + 2060;
+      if (message_offset >= din.length())
+        return;
+      din.seek(message_offset);
+      //System.out.println("record = " + record);
+      elevation_ang =din.readShort(); // RDA elevation number
+      azimuth_ang = din.readUnsignedShort();
+
+      din.skipBytes(3);
+      data_msecs = din.readInt();
+     /* if (record < recordNum[0]) {
+        radial_num = (short) (record +1);
+        elevation_num = 0;
+      } else {
+        for (int i = 1; i < sweepN; i++) {
+          if (record >= recordNum[i - 1] && record < recordNum[i]) {
+            radial_num = (short) (record - recordNum[i - 1] + 1);
+            elevation_num = (short) i;
+            continue;
+          }
+        }
+      }
+      */
+      //System.out.println(elevation_ang + " and " +azimuth_ang + " and " +record + " and " + data_msecs );
+      reflect_first_gate = 0; // range to first gate of reflectivity (m) may be negetive
+      doppler_first_gate = 0; // range to first gate of dopplar (m) may be negetive
+      reflect_gate_size = 1500; // reflectivity data gate size (m)
+      doppler_gate_size = 1500; // dopplar data gate size (m)
+      reflect_gate_count = 1000; // number of reflectivity gates
+      doppler_gate_count = 1000; // number of velocity or spectrum width gates
+      //vcp = sweepInfo[0].svcp;
+      //cut           = din.readShort(); // sector number within cut
+      //calibration   = din.readFloat(); // system gain calibration constant (db biased)
+      if(cDataForm == 24) {
+        reflect_offset = 11; // reflectivity data pointer (byte number from start of message)
+        velocity_offset = 2011; // 9 velocity data pointer (byte number from start of message)
+        spectWidth_offset = 3011;
+      } else {
+        reflect_offset = 11; // reflectivity data pointer (byte number from start of message)
+        velocity_offset = 1011; // 9 velocity data pointer (byte number from start of message)
+        spectWidth_offset = 2011;
+      }
+      // 11 spectrum-width data pointer (byte number from start of message)
+      //resolution = din.readShort(); // dopplar velocity resolution
+
+      hasReflectData = (reflect_gate_count > 0);
+      hasDopplerData = (doppler_gate_count > 0);
+    }
+
   }
 
+  public int findClosestIdx(int [] numbers, short myNumber){
+    int distance = Math.abs(numbers[0] - myNumber);
+    int idx = 0;
+    for(int c = 1; c < numbers.length; c++){
+      int cdistance = Math.abs(numbers[c] - myNumber);
+      if(cdistance < distance){
+        idx = c;
+        distance = cdistance;
+      }
+    }
+    return idx;
+  }
     public static int bytesToInt(byte [] bytes, boolean swapBytes) {
        byte a = bytes[0];
        byte b = bytes[1];
@@ -488,6 +913,14 @@ public class Cinrad2Record {
    */
   public float getAzimuth() {
     if (message_type != 1) return -1.0f;
+
+    if(Cinrad2IOServiceProvider.isSC)
+      return 360.0f * azimuth_ang / 65536.0f;
+    else if(Cinrad2IOServiceProvider.isCC)
+      return 360.0f * azimuth_ang / 512.0f;
+    else if(Cinrad2IOServiceProvider.isCC20)
+      return  azimuth_ang * 0.01f;
+
     return 180.0f * azimuth_ang / 32768.0f;
   }
 
@@ -498,6 +931,13 @@ public class Cinrad2Record {
      */
     public float getElevation() {
       if (message_type != 1) return -1.0f;
+      if(Cinrad2IOServiceProvider.isSC)
+        return 120.0f * elevation_ang / 65536.0f;
+      else if(Cinrad2IOServiceProvider.isCC)
+        return elevation_ang * 0.01f;
+      else if(Cinrad2IOServiceProvider.isCC20)
+        return elevation_ang * 0.01f;
+
       return 180.0f * elevation_ang / 32768.0f;
     }
 
@@ -561,7 +1001,12 @@ public class Cinrad2Record {
   }
 
   public java.util.Date getDate() {
-    return getDate( data_julian_date, data_msecs);
+    if(Cinrad2IOServiceProvider.isSC || Cinrad2IOServiceProvider.isCC)
+      return dateTime0.toDate();
+    else if(Cinrad2IOServiceProvider.isCC20)
+      return dateTime0.toDate();
+    else
+      return getDate( data_julian_date, data_msecs);
   }
 
   /**
@@ -595,6 +1040,64 @@ public class Cinrad2Record {
 
   }
 
+
+  public void readData0(RandomAccessFile raf, int datatype, Range gateRange, IndexIterator ii) throws IOException {
+    long offset = message_offset;
+    offset += MESSAGE_HEADER_SIZE; // offset is from "start of digital radar data message header"
+    offset += getDataOffset( datatype);
+    raf.seek(offset);
+    if (logger.isDebugEnabled()) {
+      logger.debug("  read recno "+recno+" at offset "+offset+" count= "+getGateCount(datatype));
+      logger.debug("   offset: reflect= "+reflect_offset+" velocity= "+velocity_offset+" spWidth= "+spectWidth_offset);
+    }
+
+    int dataCount = getGateCount( datatype);
+    byte[] data = new byte[dataCount];
+    byte[] b4 = new byte[4];
+    int j = 0;
+    if(datatype == REFLECTIVITY)
+      j = 0;
+    else if(datatype == VELOCITY_LOW)
+      j = 1;
+    else if(datatype == SPECTRUM_WIDTH)
+      j = 3;
+
+    //raf.readFully(data);
+
+    for (int i = gateRange.first(); i <= gateRange.last(); i += gateRange.stride()) {
+      if (i >= dataCount)
+        ii.setByteNext(MISSING_DATA);
+      else {
+        raf.read(b4);
+        data[i] = b4[j];
+        ii.setByteNext(data[i]);
+      }
+    }
+
+  }
+
+  public void readData1(RandomAccessFile raf, int datatype, Range gateRange, IndexIterator ii) throws IOException {
+    long offset = message_offset;
+    offset += MESSAGE_HEADER_SIZE; // offset is from "start of digital radar data message header"
+    offset += getDataOffset( datatype);
+    raf.seek(offset);
+    if (logger.isDebugEnabled()) {
+      logger.debug("  read recno "+recno+" at offset "+offset+" count= "+getGateCount(datatype));
+      logger.debug("   offset: reflect= "+reflect_offset+" velocity= "+velocity_offset+" spWidth= "+spectWidth_offset);
+    }
+
+    int dataCount = getGateCount( datatype );
+    short[] data = new short[dataCount];
+    raf.readShort(data, 0, dataCount);
+
+    for (int i = gateRange.first(); i <= gateRange.last(); i += gateRange.stride()) {
+      if (i >= dataCount)
+        ii.setShortNext((short)-32768);
+      else
+        ii.setShortNext(data[i]);
+    }
+
+  }
  /**
    * Instances which have same content are equal.
    *
@@ -603,7 +1106,6 @@ public class Cinrad2Record {
     if ( !(oo instanceof Cinrad2Record)) return false;
     return hashCode() == oo.hashCode();
   }
-
   /** Override Object.hashCode() to implement equals. *
   public int hashCode() {
     if (hashCode == 0) {
@@ -621,4 +1123,32 @@ public class Cinrad2Record {
     return "elev= "+elevation_num+" radial_num = "+radial_num;
   }
 
+  static class SweepInfo {
+    byte amb;
+    short arotate;
+    short pref1;
+    short pref2;
+    short spulseW;
+    short maxV;
+    short maxL;
+    short binWidth;
+    short binnumber;
+    short recordnumber;
+    float elevationAngle;
+
+    SweepInfo(RandomAccessFile din, int hoff ) throws IOException {
+      din.seek(hoff);
+      amb = din.readByte();
+      arotate = (short)din.readUnsignedShort();
+      pref1 = (short)din.readUnsignedShort();
+      pref2 = (short)din.readUnsignedShort();
+      spulseW = (short)din.readUnsignedShort();
+      maxV = (short)din.readUnsignedShort();
+      maxL = (short)din.readUnsignedShort();
+      binWidth = (short)din.readUnsignedShort();
+      binnumber = (short)din.readUnsignedShort();
+      recordnumber = (short)din.readUnsignedShort();
+      elevationAngle  = (short)din.readUnsignedShort()/100.0f;
+    }
+  }
 }

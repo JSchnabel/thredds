@@ -69,6 +69,18 @@ class NcssDatasetInfoController extends AbstractNcssController {
   @Autowired
   FeatureDatasetService datasetService;
 
+  /* @RequestMapping("/ncss/grid/**")
+  public String forwardGrid(HttpServletRequest req) {
+    String reqString = req.getServletPath();
+    assert reqString.startsWith("/ncss/grid");
+    reqString = reqString.substring(10);
+    String forwardString = "forward:/ncss" + reqString;  // strip off '?/grid
+    if (null != req.getQueryString())
+      forwardString += "?"+req.getQueryString();
+
+     return forwardString;
+  } */
+
   @RequestMapping(
           value = {"/ncss/**/dataset.html", "/ncss/**/dataset.xml",
                   "/ncss/**/pointDataset.html", "/ncss/**/pointDataset.xml"},
@@ -85,16 +97,16 @@ class NcssDatasetInfoController extends AbstractNcssController {
 
     try (FeatureDataset fd = datasetService.findDatasetByPath(req, res, datasetPath)) {
       if (fd == null)
-        throw new FileNotFoundException("Could not find Dataset "+datasetPath);
+        return; // restricted dataset
 
       String strResponse = ncssShowDatasetInfo.showForm(fd, buildDatasetUrl(datasetPath), wantXML, showPointForm);
-      res.setContentLength(strResponse.length());
 
       if (wantXML)
         res.setContentType(ContentType.xml.getContentHeader());
       else
         res.setContentType(ContentType.html.getContentHeader());
 
+      thredds.servlet.ServletUtil.setResponseContentLength(res, strResponse);
       writeResponse(strResponse, res);
     }
   }

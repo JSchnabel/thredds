@@ -57,8 +57,8 @@ import java.util.*;
 class Grib2CollectionWriter extends GribCollectionWriter {
 
   public static final String MAGIC_START = "Grib2Collectio2Index";  // was Grib2CollectionIndex
-  // protected static final int minVersionSingle = 1;
-  protected static final int version = 1;
+  protected static final int minVersion = 1;  // increment this when you want to force index rebuild
+  protected static final int version = 2;     // increment this when you want to get aa warning
 
   protected final MCollection dcm; // may be null, when read in from index
   protected final org.slf4j.Logger logger;
@@ -164,8 +164,7 @@ class Grib2CollectionWriter extends GribCollectionWriter {
 
       if (first == null) {
         deleteOnClose = true;
-        logger.error("GribCollection {}: has no files", name);
-        throw new IOException("GribCollection " + name + " has no files");
+        throw new IOException("GribCollection " + name + " has no records");
       }
 
       long pos = raf.getFilePointer();

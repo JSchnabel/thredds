@@ -1,7 +1,9 @@
 package ucar.nc2;
 
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import ucar.nc2.dataset.NetcdfDataset;
+import ucar.unidata.test.util.NeedsCdmUnitTest;
 import ucar.unidata.test.util.TestDir;
 
 import java.io.File;
@@ -18,6 +20,7 @@ import java.util.List;
  * @author caron
  * @since 2/28/11
  */
+@Category(NeedsCdmUnitTest.class)
 public class TestReadFormats {
   static int countGood = 0;
   static int countFail = 0;
@@ -44,7 +47,7 @@ public class TestReadFormats {
       if (name.endsWith(".txt")) return false;
       if (name.endsWith(".xml")) return false;
 
-      if (name.endsWith(".unf") && pathname.getPath().contains("grads")) return false;
+      if (!name.endsWith(".ctl") && pathname.getPath().contains("grads")) return false;
       if (name.endsWith(".HDR") && pathname.getPath().contains("gtopo")) return false;
       return true;
     }

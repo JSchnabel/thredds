@@ -33,15 +33,18 @@
 
 package ucar.nc2;
 
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Collection;
+
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import ucar.nc2.dataset.NetcdfDataset;
 import ucar.nc2.dt.grid.GridDataset;
+import ucar.unidata.test.util.NeedsExternalResource;
 import ucar.unidata.test.util.TestDir;
-
-import java.io.IOException;
-import java.util.*;
 
 /**
  * Describe
@@ -50,15 +53,16 @@ import java.util.*;
  * @since 6/19/2014
  */
 @RunWith(Parameterized.class)
+@Category(NeedsExternalResource.class)
 public class TestHttpOpen {
 
-  @Parameterized.Parameters
+  @Parameterized.Parameters(name="{0}")
   public static Collection testUrls() {
       Object[][] data = new Object[][]{
-              {"http://"+ TestDir.threddsTestServer+"/thredds/fileServer/testdata/2004050412_eta_211.nc"},
-              {"http://"+TestDir.threddsTestServer+"/thredds/fileServer/testdata/2004050400_eta_211.nc"},
-              {"http://"+TestDir.threddsTestServer+"/thredds/fileServer/testdata/2004050312_eta_211.nc"},
-              {"http://"+TestDir.threddsTestServer+"/thredds/fileServer/testdata/2004050300_eta_211.nc"},
+              {"http://"+ TestDir.remoteTestServer+"/thredds/fileServer/testdata/2004050412_eta_211.nc"},
+              {"http://"+TestDir.remoteTestServer+"/thredds/fileServer/testdata/2004050400_eta_211.nc"},
+              {"http://"+TestDir.remoteTestServer+"/thredds/fileServer/testdata/2004050312_eta_211.nc"},
+              {"http://"+TestDir.remoteTestServer+"/thredds/fileServer/testdata/2004050300_eta_211.nc"},
       };
       return Arrays.asList(data);
   }
@@ -67,7 +71,6 @@ public class TestHttpOpen {
   public TestHttpOpen(String url) {
       this.url = url;
   }
-
 
   // HTTP = 4300 HTTP2 = 5500 msec 20-25% slower
   @Test

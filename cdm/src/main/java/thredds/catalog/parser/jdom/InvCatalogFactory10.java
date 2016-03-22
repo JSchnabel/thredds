@@ -111,6 +111,7 @@ public class InvCatalogFactory10 implements InvCatalogConvertIF, MetadataConvert
   }
 
   private String expandAliasForCollectionSpec(String location) {
+    if (location == null) return null;
     for (PathAliasReplacement par : this.dataRootLocAliasExpanders) {
       String result = par.replaceIfMatch(location);
       if (result != null) return result;
@@ -273,7 +274,8 @@ public class InvCatalogFactory10 implements InvCatalogConvertIF, MetadataConvert
     if (authority != null) dataset.setAuthority(authority);
     if (id != null) dataset.setID(id);
     if (harvest != null) dataset.setHarvest(harvest.equalsIgnoreCase("true"));
-    if (restrictAccess != null) dataset.setResourceControl(restrictAccess);
+    if (restrictAccess != null)
+      dataset.setResourceControl(restrictAccess);
 
     if (collectionTypeName != null) {
       CollectionType collectionType = CollectionType.findType(collectionTypeName);
@@ -452,7 +454,11 @@ public class InvCatalogFactory10 implements InvCatalogConvertIF, MetadataConvert
     String name = dsElem.getAttributeValue("name");
     String path = dsElem.getAttributeValue("path");
 
-    String scanDir = expandAliasForPath(dsElem.getAttributeValue("location"));
+    String locationOrg = dsElem.getAttributeValue("location");
+    String scanDir = expandAliasForPath(locationOrg);
+    if (scanDir.startsWith("${")) {
+      scanDir = expandAliasForPath(locationOrg);  // debugging
+    }
 
     // Read datasetConfig element
     String configClassName = null;

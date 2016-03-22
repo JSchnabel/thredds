@@ -33,11 +33,15 @@
 
 package ucar.nc2.ui;
 
+import com.beust.jcommander.JCommander;
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.ParameterException;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
 import thredds.client.catalog.writer.DataFactory;
 import thredds.featurecollection.FeatureCollectionConfig;
 import thredds.inventory.bdb.MetadataManager;
 import thredds.ui.catalog.ThreddsUI;
+import ucar.httpservices.HTTPException;
 import ucar.httpservices.HTTPSession;
 import ucar.nc2.*;
 import ucar.nc2.constants.CDM;
@@ -52,7 +56,7 @@ import ucar.nc2.dt.RadialDatasetSweep;
 import ucar.nc2.ft.FeatureDataset;
 import ucar.nc2.ft.FeatureDatasetFactoryManager;
 import ucar.nc2.ft.FeatureDatasetPoint;
-import ucar.nc2.ft.grid.CoverageDataset;
+import ucar.nc2.ft.cover.CoverageDataset;
 import ucar.nc2.ft.point.PointDatasetImpl;
 import ucar.nc2.geotiff.GeoTiff;
 import ucar.nc2.grib.GribData;
@@ -85,7 +89,6 @@ import ucar.nc2.util.CancelTask;
 import ucar.nc2.util.DebugFlags;
 import ucar.nc2.util.DiskCache2;
 import ucar.nc2.util.IO;
-import ucar.nc2.util.cache.FileCache;
 import ucar.nc2.util.xml.RuntimeConfigParser;
 import ucar.util.prefs.PreferencesExt;
 import ucar.util.prefs.XMLStore;
@@ -114,8 +117,8 @@ import java.util.List;
 public class ToolsUI extends JPanel {
   static private org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ToolsUI.class);
 
-  static private final String WorldDetailMap = "/resources/nj22/ui/maps/Countries.zip";
-  static private final String USMap = "/resources/nj22/ui/maps/US.zip";
+  static private final String WorldDetailMap = "/resources/nj22/ui/maps/Countries.shp";
+  static private final String USMap = "/resources/nj22/ui/maps/us_state.shp";
 
   static private final String FRAME_SIZE = "FrameSize";
   static private final String GRIDVIEW_FRAME_SIZE = "GridUIWindowSize";
@@ -133,7 +136,7 @@ public class ToolsUI extends JPanel {
   private BufrCdmIndexPanel bufrCdmIndexPanel;
   private BufrCodePanel bufrCodePanel;
   private CdmrFeature cdmremotePanel;
-  private CdmIndex2Panel cdmIndex2Panel;
+  private CdmIndexPanel cdmIndex2Panel;
   private ReportOpPanel cdmIndexReportPanel;
   private CollectionSpecPanel fcPanel;
   private CoordSysPanel coordSysPanel;
@@ -198,6 +201,9 @@ public class ToolsUI extends JPanel {
   private DebugFlags debugFlags;
   private boolean debug = false, debugTab = false, debugCB = false;
 
+  // Check if on a mac
+  static private final String osName = System.getProperty("os.name").toLowerCase();
+  static private final boolean isMacOs = osName.startsWith("mac os x");
 
   public ToolsUI(PreferencesExt prefs, JFrame parentFrame) {
     this.mainPrefs = prefs;
@@ -275,7 +281,7 @@ public class ToolsUI extends JPanel {
 
     // nested-2 tab - grib
     //gribTabPane.addTab("CdmIndex", new JLabel("CdmIndex"));
-    gribTabPane.addTab("CdmIndex2", new JLabel("CdmIndex2"));
+    gribTabPane.addTab("CdmIndex3", new JLabel("CdmIndex3"));
     gribTabPane.addTab("CdmIndexReport", new JLabel("CdmIndexReport"));
     gribTabPane.addTab("GribIndex", new JLabel("GribIndex"));
     gribTabPane.addTab("WMO-COMMON", new JLabel("WMO-COMMON"));
@@ -469,8 +475,8 @@ public class ToolsUI extends JPanel {
       c = gribCdmIndexPanel; */
 
         break;
-      case "CdmIndex2":
-        cdmIndex2Panel = new CdmIndex2Panel((PreferencesExt) mainPrefs.node("cdmIdx2"));
+      case "CdmIndex3":
+        cdmIndex2Panel = new CdmIndexPanel((PreferencesExt) mainPrefs.node("cdmIdx3"));
         c = cdmIndex2Panel;
 
         break;
@@ -1147,7 +1153,7 @@ public class ToolsUI extends JPanel {
     if (hdf4Panel != null) hdf4Panel.save();
     if (imagePanel != null) imagePanel.save();
     if (ncdumpPanel != null) ncdumpPanel.save();
-    if (ncdumpPanel != null) ncdumpPanel.save();
+    if (ncStreamPanel != null) ncStreamPanel.save();
     if (nc4viewer != null) nc4viewer.save();
     if (ncmlEditorPanel != null) ncmlEditorPanel.save();
     if (pointFeaturePanel != null) pointFeaturePanel.save();
@@ -1200,7 +1206,7 @@ public class ToolsUI extends JPanel {
 
   private void openPointFeatureDataset(String datasetName) {
     makeComponent(ftTabPane, "PointFeature");
-    pointFeaturePanel.setPointFeatureDataset(null, datasetName);
+    pointFeaturePanel.setPointFeatureDataset(FeatureType.ANY_POINT, datasetName);
     tabbedPane.setSelectedComponent(ftTabPane);
     ftTabPane.setSelectedComponent(pointFeaturePanel);
   }
@@ -2061,6 +2067,17 @@ public class ToolsUI extends JPanel {
       coordSysTable = new CoordSysTable(prefs, buttPanel);
       add(coordSysTable, BorderLayout.CENTER);
 
+      AbstractButton summaryButton = BAMutil.makeButtcon("Information", "Summary Info", false);
+      summaryButton.addActionListener(new ActionListener() {
+        public void actionPerformed(ActionEvent e) {
+          Formatter f = new Formatter();
+          coordSysTable.summaryInfo(f);
+          detailTA.setText(f.toString());
+          detailWindow.show();
+        }
+      });
+      buttPanel.add(summaryButton);
+
       AbstractButton infoButton = BAMutil.makeButtcon("Information", "Parse Info", false);
       infoButton.addActionListener(new ActionListener() {
         public void actionPerformed(ActionEvent e) {
@@ -2081,6 +2098,7 @@ public class ToolsUI extends JPanel {
         }
       });
       buttPanel.add(infoButton);
+
 
       JButton dsButton = new JButton("Object dump");
       dsButton.addActionListener(new ActionListener() {
@@ -2161,6 +2179,7 @@ public class ToolsUI extends JPanel {
     void closeOpenFiles() throws IOException {
       if (ncd != null) ncd.close();
       ncd = null;
+      aggTable.clear();
     }
 
     AggPanel(PreferencesExt p) {
@@ -3105,16 +3124,16 @@ public class ToolsUI extends JPanel {
   } */
 
     /////////////////////////////////////////////////////////////////////
-  private class CdmIndex2Panel extends OpPanel {
-    ucar.nc2.ui.CdmIndex2Panel indexPanel;
+  private class CdmIndexPanel extends OpPanel {
+    CdmIndex3Panel indexPanel;
 
     void closeOpenFiles() throws IOException {
       indexPanel.clear();
     }
 
-      CdmIndex2Panel(PreferencesExt p) {
+      CdmIndexPanel(PreferencesExt p) {
       super(p, "index file:", true, false);
-        indexPanel = new ucar.nc2.ui.CdmIndex2Panel(prefs, buttPanel);
+        indexPanel = new CdmIndex3Panel(prefs, buttPanel);
         indexPanel.addPropertyChangeListener(new PropertyChangeListener() {
         public void propertyChange(PropertyChangeEvent e) {
           if (e.getPropertyName().equals("openGrib2Collection")) {
@@ -3208,6 +3227,7 @@ public class ToolsUI extends JPanel {
     ucar.nc2.ui.grib.Grib1CollectionPanel gribTable;
 
     void closeOpenFiles() throws IOException {
+      gribTable.closeOpenFiles();
     }
 
     Grib1CollectionPanel(PreferencesExt p) {
@@ -5021,8 +5041,6 @@ public class ToolsUI extends JPanel {
       if (bounds.y < 0) bounds.x = 0;
       viewerWindow.setBounds(bounds);
     }
-
-
     boolean process(Object o) {
       String command = (String) o;
       boolean err = false;
@@ -6254,6 +6272,11 @@ public class ToolsUI extends JPanel {
 
   //////////////////////////////////////////////////////////////////////////
   static private void exit() {
+    doSavePrefsAndUI();
+    System.exit(0);
+  }
+
+  static private void doSavePrefsAndUI()  {
     ui.save();
     Rectangle bounds = frame.getBounds();
     prefs.putBeanObject(FRAME_SIZE, bounds);
@@ -6264,13 +6287,15 @@ public class ToolsUI extends JPanel {
     }
 
     done = true; // on some systems, still get a window close event
-    ucar.nc2.util.cache.FileCacheIF cache = NetcdfDataset.getNetcdfFileCache();
-    if (cache != null)
-      cache.clearCache(true);
-    FileCache.shutdown(); // shutdown threads
-    MetadataManager.closeAll(); // shutdown bdb
 
-    System.exit(0);
+    // open files caches
+    ucar.unidata.io.RandomAccessFile.shutdown();
+    NetcdfDataset.shutdown();
+
+    // memory caches
+    GribCdmIndex.shutdown();
+
+    MetadataManager.closeAll(); // shutdown bdb
   }
 
   // handle messages
@@ -6305,19 +6330,32 @@ public class ToolsUI extends JPanel {
 
   /////////////////////////////////////////////////////////////////////
 
-    // run this on the event thread
+  // run this on the event thread
   private static void createGui() {
-    try {
-      // Switch to Nimbus Look and Feel, if it's available.
-      for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
-        if ("Nimbus".equals(info.getName())) {
-          UIManager.setLookAndFeel(info.getClassName());
-          break;
+
+    if (isMacOs) {
+      System.setProperty("apple.laf.useScreenMenuBar", "true");
+      // fixes the case where users on a mac use the system bar to quit rather than
+      // closing a window using the 'x' button.
+      Runtime.getRuntime().addShutdownHook(new Thread() {
+        @Override
+        public void run() {
+          doSavePrefsAndUI();
         }
+      });
+    } else {
+      try {
+        // Switch to Nimbus Look and Feel, if it's available.
+        for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
+          if ("Nimbus".equals(info.getName())) {
+            UIManager.setLookAndFeel(info.getClassName());
+            break;
+          }
+        }
+      } catch (ClassNotFoundException | InstantiationException | IllegalAccessException |
+              UnsupportedLookAndFeelException e) {
+        log.warn("Found Nimbus Look and Feel, but couldn't install it.", e);
       }
-    } catch (ClassNotFoundException | InstantiationException | IllegalAccessException |
-            UnsupportedLookAndFeelException e) {
-      log.warn("Found Nimbus Look and Feel, but couldn't install it.", e);
     }
 
     // get a splash screen up right away
@@ -6361,6 +6399,29 @@ public class ToolsUI extends JPanel {
 
   static boolean isCacheInit = false;
 
+  private static class CommandLine {
+    @Parameter(names = { "-nj22Config"}, description = "Runtime configuration file.", required = false)
+    public File nj22ConfigFile;
+
+    // Even though we want to accept at most 1 dataset, the JCommander main parameter must be a List<String>.
+    @Parameter(description = "Dataset")
+    public List<String> datasets = new ArrayList<>();
+
+    @Parameter(names = {"-h", "--help"}, description = "Display this help and exit", help = true)
+    public boolean help = false;
+
+    private final JCommander jc;
+
+    public CommandLine(String progName, String[] args) throws ParameterException {
+      this.jc = new JCommander(this, args);  // Parses args and uses them to initialize *this*.
+      jc.setProgramName(progName);           // Displayed in the usage information.
+    }
+
+    public void printUsage() {
+      jc.usage();
+    }
+  }
+
   public static void main(String args[]) {
     if (debugListen) {
       System.out.println("Arguments:");
@@ -6368,23 +6429,34 @@ public class ToolsUI extends JPanel {
         System.out.println(" " + arg);
       }
 
-        HTTPSession.debugHeaders(true);
+      HTTPSession.debugHeaders(true);
+    }
+
+    ////////////////////////////////////////// Parse command line //////////////////////////////////////////
+
+    String progName = ToolsUI.class.getName();
+    CommandLine cmdLine;
+
+    try {
+      cmdLine = new CommandLine(progName, args);
+
+      if (cmdLine.help) {
+        cmdLine.printUsage();
+        return;
+      }
+    } catch (ParameterException e) {
+      System.err.println(e.getMessage());
+      System.err.printf("Try \"%s --help\" for more information.%n", progName);
+      return;
     }
 
     //////////////////////////////////////////////////////////////////////////
     // handle multiple versions of ToolsUI, along with passing a dataset name
-    SocketMessage sm;
-    if (args.length > 0) {
-      // munge arguments into a single string
-      StringBuilder sbuff = new StringBuilder();
-      for (String arg : args) {
-        sbuff.append(arg);
-        sbuff.append(" ");
-      }
-      String arguments = sbuff.toString();
-      System.out.println("ToolsUI arguments=" + arguments);
 
-      wantDataset = arguments;
+    SocketMessage sm;
+
+    if (!cmdLine.datasets.isEmpty()) {
+      wantDataset = cmdLine.datasets.get(0);  // We only want one dataset. Ignore rest.
 
       // see if another version is running, if so send it the message
       sm = new SocketMessage(14444, wantDataset);
@@ -6393,7 +6465,7 @@ public class ToolsUI extends JPanel {
         System.exit(0);
       }
 
-    } else { // no arguments were passed
+    } else { // no dataset was passed
 
       // look for messages from another ToolsUI
       sm = new SocketMessage(14444, null);
@@ -6410,35 +6482,22 @@ public class ToolsUI extends JPanel {
       }
     }
 
-    if (debugListen) {
-      System.out.println("Arguments:");
-      for (String arg : args) {
-        System.out.println(" " + arg);
-      }
-      HTTPSession.debugHeaders(true);
-    }
-
     ////////////////////////////////////////////////////////////////////////////////////////////////
 
     // spring initialization
     try (ClassPathXmlApplicationContext springContext =
             new ClassPathXmlApplicationContext("classpath:resources/nj22/ui/spring/application-config.xml")) {
 
-      // look for run line arguments
       boolean configRead = false;
-      for (int i = 0; i < args.length; i++) {
-        if (args[i].equalsIgnoreCase("-nj22Config") && (i < args.length - 1)) {
-          String runtimeConfig = args[i + 1];
-          i++;
-          try {
-            StringBuilder errlog = new StringBuilder();
-            FileInputStream fis = new FileInputStream(runtimeConfig);
-            RuntimeConfigParser.read(fis, errlog);
-            configRead = true;
-            System.out.println(errlog);
-          } catch (IOException ioe) {
-            System.out.println("Error reading " + runtimeConfig + "=" + ioe.getMessage());
-          }
+
+      if (cmdLine.nj22ConfigFile != null) {
+        try (FileInputStream fis = new FileInputStream(cmdLine.nj22ConfigFile)) {
+          StringBuilder errlog = new StringBuilder();
+          RuntimeConfigParser.read(fis, errlog);
+          configRead = true;
+          System.out.println(errlog);
+        } catch (IOException ioe) {
+          System.out.println("Error reading " + cmdLine.nj22ConfigFile + "=" + ioe.getMessage());
         }
       }
 
@@ -6450,7 +6509,6 @@ public class ToolsUI extends JPanel {
             StringBuilder errlog = new StringBuilder();
             FileInputStream fis = new FileInputStream(filename);
             RuntimeConfigParser.read(fis, errlog);
-            configRead = true;
             System.out.println(errlog);
           } catch (IOException ioe) {
             System.out.println("Error reading " + filename + "=" + ioe.getMessage());
@@ -6489,15 +6547,19 @@ public class ToolsUI extends JPanel {
       //cacheManager = thredds.filesystem.ControllerCaching.makeTestController(cacheDir.getRootDirectory());
       //DatasetCollectionMFiles.setController(cacheManager); // ehcache for files
 
-    /* try {
-      //thredds.inventory.bdb.MetadataManager.setCacheDirectory(fcCache, maxSizeBytes, jvmPercent);
-      //thredds.inventory.CollectionManagerAbstract.setMetadataStore(thredds.inventory.bdb.MetadataManager.getFactory());
-    } catch (Exception e) {
-      log.error("CdmInit: Failed to open CollectionManagerAbstract.setMetadataStore", e);
-    } */
+      try {
+        // thredds.inventory.bdb.MetadataManager.setCacheDirectory(fcCache, maxSizeBytes, jvmPercent); // use defaults
+        thredds.inventory.CollectionManagerAbstract.setMetadataStore(thredds.inventory.bdb.MetadataManager.getFactory());
+      } catch (Exception e) {
+        log.error("CdmInit: Failed to open CollectionManagerAbstract.setMetadataStore", e);
+      }
 
       UrlAuthenticatorDialog provider = new UrlAuthenticatorDialog(frame);
-      HTTPSession.setGlobalCredentialsProvider(provider);
+      try {
+        HTTPSession.setGlobalCredentialsProvider(provider);
+      }catch (HTTPException e) {
+        log.error("Failed to set global credentials");
+      }
       HTTPSession.setGlobalUserAgent("ToolsUI v4.6");
 
       // set Authentication for accessing passsword protected services like TDS PUT

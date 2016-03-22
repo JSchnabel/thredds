@@ -1,4 +1,16 @@
-apply plugin: 'shadow'
+description = "Several netCDF-Java IOSPs that depend on the VisAD library including a GEMPAK IOSP for grid, station, " +
+        "and sounding datasets; a McIDAS IOSP for grid datasets; and an ADDE IOSP for image and station datasets."
+ext.title = "VisAD-based IOSPs"
+
+dependencies {
+    compile project(':cdm')
+    compile project(':grib')
+
+    compile libraries["visad"]
+    compile libraries["guava"]
+
+    compile libraries["slf4j-api"]
+}
 
 /* jar {
   manifest {
@@ -51,17 +63,6 @@ apply plugin: 'shadow'
   }
 
 } */
-
-dependencies {
-    compile project(':cdm')
-    compile project(':grib')
-
-    compile libraries["visad"]
-    compile libraries["guava"]
-
-    compile libraries["slf4j-api"]
-    testRuntime libraries["slf4j-jdk14"]
-}
 
 //shadow {
 //    outputFile = file("${destinationDir}/visadCdm-${version}.jar")

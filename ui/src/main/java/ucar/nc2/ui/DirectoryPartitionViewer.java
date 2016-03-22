@@ -56,7 +56,7 @@ public class DirectoryPartitionViewer extends JPanel {
 
   private FeatureCollectionConfig config;
   private String collectionName;
-  private CdmIndex2Panel cdmIndexTables;
+  private CdmIndex3Panel cdmIndexTables;
   private PartitionsTable partitionsTable;
 
   private JPanel tablePanel;
@@ -76,7 +76,7 @@ public class DirectoryPartitionViewer extends JPanel {
     partitionTreeBrowser = new PartitionTreeBrowser();
     partitionsTable = new PartitionsTable((PreferencesExt) prefs.node("partTable"));
 
-    cdmIndexTables = new CdmIndex2Panel((PreferencesExt) prefs.node("cdmIdx"), buttPanel);
+    cdmIndexTables = new CdmIndex3Panel((PreferencesExt) prefs.node("cdmIdx"), buttPanel);
     cdmIndexTables.addPropertyChangeListener(new PropertyChangeListener() {
       public void propertyChange(PropertyChangeEvent evt) {
         firePropertyChange(evt.getPropertyName(), evt.getOldValue(), evt.getNewValue());
@@ -253,8 +253,8 @@ public class DirectoryPartitionViewer extends JPanel {
 
     Formatter errlog = new Formatter();
     config = FeatureCollectionReader.readFeatureCollection(doc.getRootElement());
-    CollectionSpecParser spec = new CollectionSpecParser(config.spec, errlog);
-    partitionTreeBrowser.setRoot(Paths.get(spec.getRootDir()));
+    CollectionSpecParser specp = config.getCollectionSpecParser(errlog);
+    partitionTreeBrowser.setRoot(Paths.get(specp.getRootDir()));
   }
 
   // ncx2 index
@@ -337,7 +337,6 @@ public class DirectoryPartitionViewer extends JPanel {
 
            final List<GribCollectionMutable> gclist = new ArrayList<>();
            for (PartitionCollectionMutable.Partition tpp : tp.getPartitions()) {
-             if (tpp.isBad()) continue;
              try ( GribCollectionMutable gc = tpp.makeGribCollection()) {    // use index if it exists
                if (gc != null)
                  gclist.add(gc);

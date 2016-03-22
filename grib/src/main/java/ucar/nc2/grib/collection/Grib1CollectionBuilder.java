@@ -90,6 +90,9 @@ public class Grib1CollectionBuilder extends GribCollectionBuilder {
     // place each record into its group
     int totalRecords = 0;
     try (CloseableIterator<MFile> iter = dcm.getFileIterator()) { // not sorted
+      if (iter == null)
+        return new ArrayList<>(); // empty
+
       while (iter.hasNext()) {
         MFile mfile = iter.next();
         Grib1Index index;
@@ -107,6 +110,11 @@ public class Grib1CollectionBuilder extends GribCollectionBuilder {
           logger.error("Grib2CollectionBuilder " + name + " : reading/Creating gbx9 index for file " + mfile.getPath() + " failed", ioe);
           continue;
         }
+        if (index == null) {
+          logger.error("Grib2CollectionBuilder " + name + " : reading/Creating gbx9 index for file " + mfile.getPath() + " failed");
+          continue;
+        }
+
         int n = index.getNRecords();
         totalRecords += n;
 
@@ -121,10 +129,10 @@ public class Grib1CollectionBuilder extends GribCollectionBuilder {
           }
 
           gr.setFile(fileno); // each record tracks which file it belongs to
-          Grib1Gds gdsHashObject = gr.getGDS();  // use GDS to group records
-          int gdsHash = gribConfig.convertGdsHash(gdsHashObject.hashCode());  // allow external config to muck with gdsHash. Why? because of error in encoding and we need exact hash matching
-          if (0 == gdsHash)
-            continue; // skip this group
+          Grib1Gds gds = gr.getGDS();  // use GDS to group records
+          int hashOverride = gribConfig.convertGdsHash(gds.hashCode());  // allow external config to muck with gdsHash. Why? because of error in encoding and we need exact hash matching
+          if (0 == hashOverride) continue; // skip this group
+          GdsHashObject gdsHashObject = new GdsHashObject(gr.getGDS(), hashOverride);
 
           CalendarDate runtimeDate = gr.getReferenceDate();
           long runtime = singleRuntime ? runtimeDate.getMillis() : 0;  // seperate Groups for each runtime, if singleRuntime is true
@@ -170,8 +178,8 @@ public class Grib1CollectionBuilder extends GribCollectionBuilder {
     if (intv == null) return false;
     int haveLength = intv[1] - intv[0];
 
-    // discard zero length intervals (default)
-    if (haveLength == 0 && (intvFilter == null || intvFilter.isZeroExcluded()))
+    // discard zero length intervals
+    if (haveLength == 0 && intvFilter != null && intvFilter.isZeroExcluded()) // default dont discard
       return true;
 
     if (intvFilter != null && intvFilter.hasFilter()) {

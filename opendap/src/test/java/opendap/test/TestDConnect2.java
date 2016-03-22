@@ -1,18 +1,27 @@
 package opendap.test;
 
-import opendap.dap.*;
+import java.io.ByteArrayOutputStream;
+import java.io.FileWriter;
+import java.io.PrintStream;
+
+import opendap.dap.DAS;
+import opendap.dap.DConnect2;
+import opendap.dap.DDS;
+import opendap.dap.DataDDS;
 import opendap.util.Getopts;
 import opendap.util.InvalidSwitch;
+import org.junit.Assert;
+import org.junit.Before;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import ucar.unidata.test.Diff;
+import ucar.unidata.test.util.NeedsExternalResource;
 
-import java.io.*;
-
+@Category(NeedsExternalResource.class)
 public class TestDConnect2 extends TestSources {
 
   static boolean debug = false;
   static boolean createbaseline = true;
-
 
   final String TITLE = "DAP DConnect2 Tests";
 
@@ -53,13 +62,14 @@ public class TestDConnect2 extends TestSources {
     setTitle("DAP DConnect2 Tests");
   }
 
-  protected void setUp() {
+  @Before
+  public void setUp() {
     passcount = 0;
     xfailcount = 0;
     failcount = 0;
   }
 
-  void test1(String test) throws Exception {
+  void dotest(String test) throws Exception {
     boolean constrained = false;
     this.test = test;
     this.testname = test;
@@ -95,8 +105,7 @@ public class TestDConnect2 extends TestSources {
     testpart(TestPart.DDS, ce);
     if (constrained) testpart(TestPart.DATADDS, ce);
     if (!pass)
-      assertTrue(testname, pass);
-
+      Assert.assertTrue(testname, pass);
   }
 
   void testpart(TestPart part, String ce) {
@@ -137,12 +146,12 @@ public class TestDConnect2 extends TestSources {
         System.out.println(result);
       }
 
-      String testdata = accessTestData(testprefix, testdataname, part);
+      String testdata = accessTestData(testdir, testdataname, part);
       if (testdata == null) {
         System.err.println("No comparison testdata found: " + testdataname + partext(part));
         System.err.println(result);
         if (createbaseline) {
-          String fname = testprefix + "/" + testdataname + partext(part);
+          String fname = this.testdir + "/" + testdataname + partext(part);
           System.err.println("Creating: " + fname);
           FileWriter fw = new FileWriter(fname);
           fw.write(result);
@@ -187,7 +196,7 @@ public class TestDConnect2 extends TestSources {
       System.out.printf("Base URL: %s\n", currentTestSet.url);
 
       for (String test : currentTestSet.tests) {
-        test1(test);
+        dotest(test);
       }
     }
 

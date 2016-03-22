@@ -1,15 +1,17 @@
 package thredds.tds.idd;
 
-import org.junit.runners.Parameterized;
-import org.junit.runner.RunWith;
-import org.junit.Test;
-
 import java.util.Collection;
 
+import org.junit.Test;
+import org.junit.experimental.categories.Category;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import thredds.client.catalog.Catalog;
 import thredds.tds.ethan.TestAll;
+import ucar.unidata.test.util.NeedsExternalResource;
+import ucar.unidata.test.util.TestDir;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertNotNull;
 
 /**
  * Ping a TDS assuming an IDD setup.
@@ -18,9 +20,10 @@ import static org.junit.Assert.*;
  * @since 4.0
  */
 @RunWith(Parameterized.class)
+@Category(NeedsExternalResource.class)
 public class PingMotherlodeTdsTest
 {
-  private String tdsUrl = "http://thredds.ucar.edu/thredds/";
+  private String tdsUrl = "http://"+ TestDir.threddsServer+"/thredds/";
 
   private String catUrl;
 
@@ -30,7 +33,7 @@ public class PingMotherlodeTdsTest
     this.catUrl = catUrl;
   }
 
-  @Parameterized.Parameters
+  @Parameterized.Parameters(name="{0}")
   public static Collection<Object[]> getCatalogUrls()
   {
     Collection<Object[]> catUrls = StandardCatalogUtils.getIddMainCatalogUrlArrayCollection();

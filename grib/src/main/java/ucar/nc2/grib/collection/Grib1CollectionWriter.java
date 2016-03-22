@@ -53,7 +53,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Grib1 specific ncx2 writer
+ * Grib1 specific ncx writer
  *
  * @author caron
  * @since 2/20/14
@@ -61,7 +61,8 @@ import java.util.Set;
 class Grib1CollectionWriter extends GribCollectionWriter {
 
   public static final String MAGIC_START = "Grib1Collectio2Index";  // was Grib1CollectionIndex
-  protected static final int version = 1;
+  protected static final int minVersion = 1;
+  protected static final int version = 2;
 
   protected final MCollection dcm; // may be null, when read in from index
   protected final org.slf4j.Logger logger;
@@ -159,8 +160,7 @@ class Grib1CollectionWriter extends GribCollectionWriter {
 
       if (first == null) {
         deleteOnClose = true;
-        logger.error("GribCollection {}: has no files", name);
-        throw new IOException("GribCollection " + name + " has no files");
+        throw new IOException("GribCollection " + name + " has no records");
       }
 
       long pos = raf.getFilePointer();

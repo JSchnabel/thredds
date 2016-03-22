@@ -1,19 +1,25 @@
 package ucar.nc2.grib;
 
 import org.junit.AfterClass;
+import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import thredds.featurecollection.FeatureCollectionConfig;
 import thredds.featurecollection.FeatureCollectionType;
 import thredds.inventory.CollectionUpdateType;
+import ucar.nc2.Group;
+import ucar.nc2.NetcdfFile;
 import ucar.nc2.grib.collection.GribCdmIndex;
 import ucar.nc2.grib.collection.GribCollectionImmutable;
 import ucar.nc2.grib.collection.GribIosp;
 import ucar.nc2.grib.collection.PartitionCollectionImmutable;
 import ucar.nc2.util.DebugFlagsImpl;
+import ucar.nc2.util.DiskCache2;
 import ucar.nc2.util.cache.FileCache;
 import ucar.nc2.util.cache.FileCacheIF;
 import ucar.unidata.io.RandomAccessFile;
+import ucar.unidata.test.util.NeedsCdmUnitTest;
 import ucar.unidata.test.util.TestDir;
 
 import java.io.IOException;
@@ -25,6 +31,7 @@ import java.util.Formatter;
  * @author caron
  * @since 11/14/2014
  */
+@Category(NeedsCdmUnitTest.class)
 public class TestGribIndexCreation {
   private static CollectionUpdateType updateMode = CollectionUpdateType.always;
 
@@ -38,6 +45,11 @@ public class TestGribIndexCreation {
     // GribIosp.setDebugFlags(new DebugFlagsImpl("Grib/indexOnly"));
     GribCdmIndex.setGribCollectionCache(new ucar.nc2.util.cache.FileCacheGuava("GribCollectionCacheGuava", 100));
     GribCdmIndex.gribCollectionCache.resetTracking();
+
+    // make sure that the indexes are created with the data files
+    DiskCache2 diskCache = GribIndexCache.getDiskCache2();
+    diskCache.setNeverUseCache(true);
+    diskCache.setAlwaysUseCache(false);
   }
 
   @AfterClass
@@ -70,19 +82,29 @@ public class TestGribIndexCreation {
 
   /////////////////////////////////////////////////////////
 
-
   @Test
   public void testGdsHashChange() throws IOException {
-    FeatureCollectionConfig config = new FeatureCollectionConfig("NDFD-CONUS_5km_conduit", "test/NDFD-CONUS_5km_conduit", FeatureCollectionType.GRIB2,
-            TestDir.cdmUnitTestDir + "gribCollections/gdsHashChange/.*grib2", null, null, null, "file", null);
-    config.gribConfig.addGdsHash("-328645426", "1821883766");
+    GribIosp.setDebugFlags(new DebugFlagsImpl("Grib/debugGbxIndexOnly"));
+    FeatureCollectionConfig config = new FeatureCollectionConfig("NDFD-CONUS_noaaport", "test/NDFD-CONUS_noaaport", FeatureCollectionType.GRIB2,
+            TestDir.cdmUnitTestDir + "gribCollections/gdsHashChange/noaaport/.*gbx9", null, null, null, "file", null);
+    // 	  <gdsHash from='-1506003048' to='-1505079527'/>
+    config.gribConfig.addGdsHash("-1506003048", "-1505079527");
 
     org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("test");
     boolean changed = GribCdmIndex.updateGribCollection(config, updateMode, logger);
     System.out.printf("changed = %s%n", changed);
     // LOOK add check that records were combined
-  }
+    try (NetcdfFile ncfile = NetcdfFile.open(TestDir.cdmUnitTestDir + "gribCollections/gdsHashChange/noaaport/NDFD-CONUS_noaaport.ncx3", null)) {
+      Group root = ncfile.getRootGroup();
+      Assert.assertEquals(2, root.getGroups().size());
+      Group twoD = root.findGroup("TwoD");
+      assert twoD != null;
+      Assert.assertEquals(0, twoD.getGroups().size());
+    }
 
+
+    GribIosp.setDebugFlags(new DebugFlagsImpl(""));
+  }
 
   @Test
   public void testCfrsAnalysisOnly() throws IOException {
@@ -130,6 +152,18 @@ public class TestGribIndexCreation {
   }
 
   @Test
+  public void testSeanProblem() throws IOException {
+
+
+    FeatureCollectionConfig config = new FeatureCollectionConfig("gfs_2p5deg", "test/gfs_2p5deg", FeatureCollectionType.GRIB2,
+            TestDir.cdmUnitTestDir + "gribCollections/gfs_2p5deg/.*grib2", null, null,  null, "file", null);
+
+    org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("test");
+    boolean changed = GribCdmIndex.updateGribCollection(config, updateMode, logger);
+    System.out.printf("changed = %s%n", changed);
+  }
+
+  @Test
   public void testEnsembles() throws IOException {
     FeatureCollectionConfig config = new FeatureCollectionConfig("gefs_ens", "test/gefs_ens", FeatureCollectionType.GRIB2,
             TestDir.cdmUnitTestDir + "gribCollections/ens/.*grib2", null, null,  null, "file", null);
@@ -154,7 +188,7 @@ public class TestGribIndexCreation {
     config.gribConfig.unionRuntimeCoord = true;
 
     org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("test");
-    boolean changed = GribCdmIndex.updateGribCollection(config, CollectionUpdateType.test, logger);
+    boolean changed = GribCdmIndex.updateGribCollection(config, updateMode, logger);
     System.out.printf("changed = %s%n", changed);
     GribIosp.setDebugFlags(new DebugFlagsImpl());
   }
@@ -163,12 +197,11 @@ public class TestGribIndexCreation {
   public void testRdvamds083p2() throws IOException {
     GribIosp.setDebugFlags(new DebugFlagsImpl("Grib/debugGbxIndexOnly"));
     FeatureCollectionConfig config = new FeatureCollectionConfig("ds083.2_Aggregation", "test/ds083.2", FeatureCollectionType.GRIB1,
-//            "B:/rdavm/ds083.2/grib1/**/.*gbx9",
             TestDir.cdmUnitTestDir + "gribCollections/rdavm/ds083.2/grib1/**/.*gbx9",
             null, null, null, "directory", null);
     config.gribConfig.unionRuntimeCoord = true;
     org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("always");
-    boolean changed = GribCdmIndex.updateGribCollection(config, CollectionUpdateType.testIndexOnly, logger);
+    boolean changed = GribCdmIndex.updateGribCollection(config, CollectionUpdateType.always, logger);
     System.out.printf("changed = %s%n", changed);
     GribIosp.setDebugFlags(new DebugFlagsImpl());
   }
@@ -177,8 +210,7 @@ public class TestGribIndexCreation {
   public void testRdvamds083p2_1999() throws IOException {
     GribIosp.setDebugFlags(new DebugFlagsImpl("Grib/debugGbxIndexOnly"));
     FeatureCollectionConfig config = new FeatureCollectionConfig("ds083.2_Aggregation", "test/ds083.2", FeatureCollectionType.GRIB1,
-//            "B:/rdavm/ds083.2/grib1/**/.*gbx9",
-            TestDir.cdmUnitTestDir + "gribCollections/rdavm/ds083.2/grib1/1999/**/.*gbx9",
+            TestDir.cdmUnitTestDir + "gribCollections/rdavm/ds083.2/grib1/2008/**/.*gbx9",
             null, null, null,  "directory", null);
     config.gribConfig.unionRuntimeCoord = true;
     org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("always");
@@ -238,8 +270,22 @@ public class TestGribIndexCreation {
             TestDir.cdmUnitTestDir + "tds/ncep/WW3_Coastal_Alaska_20140804_0000.grib2", null,
             null, null, "file", null);
     org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("test");
-    boolean changed = GribCdmIndex.updateGribCollection(config, CollectionUpdateType.always, logger);
+    boolean changed = GribCdmIndex.updateGribCollection(config, updateMode, logger);
     System.out.printf("changed = %s%n", changed);
   }
+
+  @Test
+   public void testTP() throws IOException {   // should be a TP (multiple runtime, single offset
+     // String name, String path, FeatureCollectionType fcType,
+     // String spec, String collectionName,
+     // String dateFormatMark, String olderThan, String timePartition, Element innerNcml)
+     FeatureCollectionConfig config = new FeatureCollectionConfig("GFSonedega", "test/GFSonedega", FeatureCollectionType.GRIB2,
+             TestDir.cdmUnitTestDir + "gribCollections/tp/.*grib2", null,
+             null, null, "file", null);
+     org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("test");
+     boolean changed = GribCdmIndex.updateGribCollection(config, updateMode, logger);
+     System.out.printf("changed = %s%n", changed);
+   }
+
 
 }

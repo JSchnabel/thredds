@@ -81,10 +81,14 @@ public class NcDDS extends ServerDDS {
   public NcDDS(String name, NetcdfFile ncfile) {
     super((name));
 
-    if (ncfile instanceof NetcdfDataset)
-      createFromDataset((NetcdfDataset) ncfile);
-    else
-      createFromFile(ncfile);
+    if (ncfile instanceof NetcdfDataset) {
+      NetcdfDataset ncd = (NetcdfDataset) ncfile;
+      if (ncd.getEnhanceMode().contains(NetcdfDataset.Enhance.CoordSystems)) {
+        createFromDataset((NetcdfDataset) ncfile);
+        return;
+      }
+    }
+    createFromFile(ncfile);
   }
 
   private void createFromFile(NetcdfFile ncfile) {

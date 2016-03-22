@@ -134,11 +134,12 @@ public class CdmRemoteController extends AbstractController implements LastModif
     NetcdfFile ncfile = null;
     try {
       ncfile = DatasetHandler.getNetcdfFile(req, res, datasetPath);
-      if (ncfile == null) {
+      if (ncfile == null) return;
+      /*
         res.setStatus(HttpServletResponse.SC_NOT_FOUND);
         log.debug("DatasetHandler.FAIL path={}", datasetPath);
         return;
-      }
+      } */
 
       long size = -1;
 
@@ -160,9 +161,8 @@ public class CdmRemoteController extends AbstractController implements LastModif
 
           ncfile.setLocation(datasetPath); // hide where the file is stored
           String cdl = ncfile.toString();
-          res.setContentLength(cdl.length());
+          size = (long) thredds.servlet.ServletUtil.setResponseContentLength(res, cdl);
           pw.write(cdl);
-          size = cdl.length();
           break;
         }
 
@@ -208,7 +208,7 @@ public class CdmRemoteController extends AbstractController implements LastModif
           StringTokenizer stoke = new StringTokenizer(query, ";"); // need UTF/%decode
           while (stoke.hasMoreTokens()) {
             ParsedSectionSpec cer = ParsedSectionSpec.parseVariableSection(ncfile, stoke.nextToken());
-            size += ncWriter.sendData(cer.v, cer.section, out, false);
+            size += ncWriter.sendData(cer.v, cer.section, out, qb.getCompression());
           }
           out.flush();
         }

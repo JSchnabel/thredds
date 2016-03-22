@@ -32,10 +32,14 @@
 
 package ucar.nc2.iosp.grib;
 
+import org.apache.commons.io.FileUtils;
+import org.junit.Assert;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import ucar.nc2.NetcdfFile;
 import ucar.nc2.grib.GribIndexCache;
 import ucar.nc2.util.DiskCache2;
+import ucar.unidata.test.util.NeedsCdmUnitTest;
 import ucar.unidata.test.util.TestDir;
 
 import java.io.File;
@@ -46,21 +50,20 @@ import java.io.File;
  * @author caron
  * @since 2/16/12
  */
+@Category(NeedsCdmUnitTest.class)
 public class TestGribDiskCache {
 
   @Test
   public void testDiskCache() throws Exception {
     String cacheDirName = TestDir.temporaryLocalDataDir +"TestGribDiskCache/";
-    File cacheDir = new File(cacheDirName);
-    if (cacheDir.exists()) {
-      for (File data : cacheDir.listFiles()) data.delete();
-      cacheDir.delete();
-    }
+    System.out.printf("cacheDir=%s%n", cacheDirName);
+    File cacheDir = new File("cacheDirName") ;
+    FileUtils.deleteDirectory(cacheDir); // from commons-io
     assert !cacheDir.exists();
 
     DiskCache2 cache = new DiskCache2(cacheDirName, false, 0, 0);
     cache.setAlwaysUseCache(true);
-    assert cache.getRootDirectory().equals(cacheDirName) : cache.getRootDirectory()+" != " + cacheDirName;
+    Assert.assertEquals(cache.getRootDirectory(), cacheDirName);
     assert new File(cache.getRootDirectory()).exists();
     GribIndexCache.setDiskCache2(cache);
 

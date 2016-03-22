@@ -32,11 +32,16 @@
  */
 package opendap.test;
 
+import java.io.IOException;
+import java.io.StringWriter;
+
+import org.junit.Assert;
+import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import ucar.nc2.dataset.NetcdfDataset;
 import ucar.nc2.util.UnitTestCommon;
+import ucar.unidata.test.util.NeedsExternalResource;
 import ucar.unidata.test.util.TestDir;
-
-import java.io.*;
 
 /**
  * Test nc2 dods in the JUnit framework.
@@ -70,18 +75,19 @@ public class TestGrid2 extends UnitTestCommon
         setSystemProperties();
     }
 
+    @Test
+    @Category(NeedsExternalResource.class)
     public void testGrid2()
             throws Exception
     {
-
         System.out.println("TestGrid2:");
         String url = null;
         boolean pass = true;
         NetcdfDataset ncfile = null;
         if(TestDir.threddsTestServer.startsWith("localhost"))
-            url = "dods://" + TestDir.threddsTestServer + URLPATH_LOCAL;
+            url = "dods://" + TestDir.remoteTestServer + URLPATH_LOCAL;
         else
-            url = "dods://" + TestDir.threddsTestServer + URLPATH_REMOTE;
+            url = "dods://" + TestDir.remoteTestServer + URLPATH_REMOTE;
 
         try {
             ncfile = NetcdfDataset.openDataset(url);
@@ -90,7 +96,7 @@ public class TestGrid2 extends UnitTestCommon
             pass = false;
         }
 
-        assertTrue("XFAIL : TestGrid2: cannot open dataset ="+url, true);
+        Assert.assertTrue("XFAIL : TestGrid2: cannot open dataset =" + url, true);
         if(!pass) return;
 
         System.out.println("url: " + url);
@@ -116,7 +122,7 @@ public class TestGrid2 extends UnitTestCommon
                 }
             }
         }
-        assertTrue("XFAIL : Testing TestGrid2" + getTitle(), true);
+        Assert.assertTrue("XFAIL : Testing TestGrid2" + getTitle(), true);
     }
 
     String ncdumpmetadata(NetcdfDataset ncfile)

@@ -43,6 +43,7 @@ import ucar.nc2.*;
 import ucar.nc2.grib.*;
 import ucar.nc2.grib.grib2.table.Grib2Customizer;
 import ucar.unidata.io.RandomAccessFile;
+import ucar.unidata.io.http.HTTPRandomAccessFile;
 import ucar.unidata.util.StringUtil2;
 
 import java.io.IOException;
@@ -351,12 +352,18 @@ public class Grib2Iosp extends GribIosp {
 
   private Grib2Customizer cust;
 
-  // accept grib2 or ncx2 files
+  // accept grib2 or ncx files
   @Override
   public boolean isValidFile(RandomAccessFile raf) throws IOException {
-    GribCdmIndex.GribCollectionType type = GribCdmIndex.getType(raf);
-    if (type == GribCdmIndex.GribCollectionType.GRIB2) return true;
-    if (type == GribCdmIndex.GribCollectionType.Partition2) return true;
+    if (raf instanceof HTTPRandomAccessFile) { // only do remote if memory resident
+      if (raf.length() > raf.getBufferSize())
+        return false;
+
+    } else {                                  // wont accept remote index
+      GribCdmIndex.GribCollectionType type = GribCdmIndex.getType(raf);
+      if (type == GribCdmIndex.GribCollectionType.GRIB2) return true;
+      if (type == GribCdmIndex.GribCollectionType.Partition2) return true;
+    }
 
     // check for GRIB2 data file
     return Grib2RecordScanner.isValidFile(raf);

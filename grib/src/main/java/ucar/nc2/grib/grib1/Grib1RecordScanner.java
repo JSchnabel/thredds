@@ -64,6 +64,17 @@ public class Grib1RecordScanner {
   static private final boolean debugGds = false;
   static private final int maxScan = 16000;
 
+  static boolean allowBadIsLength = false;
+  static boolean allowBadDsLength = false; // ECMWF workaround
+
+  public static void setAllowBadIsLength(boolean allowBadIsLength) {
+    Grib1RecordScanner.allowBadIsLength = allowBadIsLength;
+  }
+
+  public static void setAllowBadDsLength(boolean allowBadDsLength) {
+    Grib1RecordScanner.allowBadDsLength = allowBadDsLength;
+  }
+
   static public boolean isValidFile(RandomAccessFile raf) {
     try {
       raf.seek(0);
@@ -76,6 +87,8 @@ public class Grib1RecordScanner {
 
       // check ending = 7777
       if (len > raf.length()) return false;
+      if (allowBadIsLength) return true;
+
       raf.skipBytes(len-12);
       for (int i = 0; i < 4; i++) {
         if (raf.read() != 55) return false;
@@ -148,8 +161,12 @@ public class Grib1RecordScanner {
 
       Grib1SectionBitMap bitmap = pds.bmsExists() ? new Grib1SectionBitMap(raf) : null;
       Grib1SectionBinaryData dataSection = new Grib1SectionBinaryData(raf);
-      if (dataSection.getStartingPosition() + dataSection.getLength() > is.getEndPos()) { // presumably corrupt
-        raf.seek(dataSection.getStartingPosition()); // go back to start of the dataSection, in hopes of salvaging
+
+      long ending = is.getEndPos();
+      long dataEnding = dataSection.getStartingPosition() + dataSection.getLength();
+
+      if (dataEnding > is.getEndPos()) { // presumably corrupt
+        // raf.seek(dataSection.getStartingPosition()); // go back to start of the dataSection, in hopes of salvaging
         log.warn("BAD GRIB-1 data message at " + dataSection.getStartingPosition() + " header= " + StringUtil2.cleanup(header)+" for="+raf.getLocation());
         throw new IllegalStateException("Illegal Grib1SectionBinaryData Message Length");
       }
@@ -177,32 +194,28 @@ public class Grib1RecordScanner {
       else
         gdsMap.put(crc, gds);
 
-      long ending = is.getEndPos();
-
       // check that end section is correct
-      boolean foundEnding = true;
-      raf.seek(ending-4);
-      for (int i = 0; i < 4; i++) {
-        if (raf.read() != 55) {
-          foundEnding = false;
-          String clean = StringUtil2.cleanup(header);
-          if (clean.length() > 40) clean = clean.substring(0,40) + "...";
-          log.debug("Missing End of GRIB message at pos=" + ending + " header= " + clean+" for="+raf.getLocation());
-          break;
-        }
-      }
+      boolean foundEnding = checkEnding(ending);
       if (debug) System.out.printf(" read until %d grib ending at %d header ='%s' foundEnding=%s%n",
               raf.getFilePointer(), ending, StringUtil2.cleanup(header), foundEnding);
+
+      if (!foundEnding && allowBadIsLength)
+        foundEnding = checkEnding(dataSection.getStartingPosition() + dataSection.getLength());
+
+      if (!foundEnding && allowBadDsLength) {
+        foundEnding = true;
+      }
 
       if (foundEnding) {
         lastPos = raf.getFilePointer();
         return new Grib1Record(header, is, gds, pds, bitmap, dataSection);
-
-      } else { // skip this record, start scanning again at end of is + 20 bytes
-        lastPos = is.getEndPos() + 20;
-        if (hasNext()) // search forward for another one
-         return next();
       }
+
+      // skip this record
+      // lastPos = is.getEndPos() + 20;  cant use is.getEndPos(), may be bad
+      lastPos += 20;  // skip over the "GRIB" of this message
+      if (hasNext()) // search forward for another one
+        return next();
 
     } catch (Throwable t) {
       long pos = (is == null) ? -1 : is.getStartPos();
@@ -215,6 +228,22 @@ public class Grib1RecordScanner {
 
     return null; // last record was incomplete
   }
+
+  private boolean checkEnding(long ending) throws IOException {
+    // check that end section = "7777" is correct
+    raf.seek(ending - 4);
+    for (int i = 0; i < 4; i++) {
+      if (raf.read() != 55) {
+        String clean = StringUtil2.cleanup(header);
+        if (clean.length() > 40) clean = clean.substring(0, 40) + "...";
+        log.debug("Missing End of GRIB message at pos=" + ending + " header= " + clean + " for=" + raf.getLocation());
+        return false;
+      }
+    }
+    return true;
+  }
+
+
 
   public static void main(String[] args) throws IOException {
     int count = 0;

@@ -71,10 +71,13 @@ import java.io.IOException;
 public class ThreddsDataFactory {
   static public final String PROTOCOL = "thredds";
   static public final String SCHEME = PROTOCOL + ":";
-  static private boolean preferCdm = true;
+  static private ServiceType[] preferAccess;
 
   static public void setPreferCdm(boolean prefer) {
-    preferCdm = prefer;
+    preferAccess = prefer ? new ServiceType[] {ServiceType.CdmRemote} : null;
+  }
+  static public void setPreferAccess(ServiceType... prefer) {
+    preferAccess = prefer;
   }
 
   static public void setDebugFlags(ucar.nc2.util.DebugFlags debugFlag) {
@@ -503,7 +506,7 @@ public class ThreddsDataFactory {
 
     // open CdmRemote
     else if ((serviceType == ServiceType.HTTP) || (serviceType == ServiceType.HTTPServer)) {
-      String curl =  (datasetLocation.startsWith("http:")) ? "nodods:" + datasetLocation.substring(5) : datasetLocation;
+      String curl =  (datasetLocation.startsWith("http:")) ? "httpserver::" + datasetLocation.substring(5) : datasetLocation;
       ds = acquire ? NetcdfDataset.acquireDataset(curl, enhanceMode, task) : NetcdfDataset.openDataset(curl, enhanceMode, task);
     }
 
@@ -540,8 +543,17 @@ public class ThreddsDataFactory {
     if (accessList.size() == 0)
       return null;
 
+    InvAccess access = null;
+    if (preferAccess != null) {
+      for (ServiceType type : preferAccess) {
+        access = findAccessByServiceType(accessList, type);
+        if (access != null) break;
+      }
+    }
+
     // the order indicates preference
-    InvAccess access = findAccessByServiceType(accessList, ServiceType.CdmRemote);
+    if (access == null)
+      access = findAccessByServiceType(accessList, ServiceType.CdmRemote);
     if (access == null)
       access = findAccessByServiceType(accessList, ServiceType.DODS);
     if (access == null)

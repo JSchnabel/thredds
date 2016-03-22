@@ -32,35 +32,31 @@
  */
 package ucar.nc2;
 
+import ucar.ma2.*;
 import ucar.nc2.constants.CDM;
 import ucar.nc2.iosp.AbstractIOServiceProvider;
-import ucar.nc2.util.Indent;
-import ucar.nc2.util.EscapeStrings;
-import ucar.ma2.*;
-import ucar.nc2.util.rc.RC;
-import ucar.unidata.io.UncompressInputStream;
-import ucar.unidata.io.InMemoryRandomAccessFile;
-import ucar.unidata.io.bzip2.CBZip2InputStream;
-import ucar.nc2.util.DiskCache;
-import ucar.nc2.util.CancelTask;
-import ucar.nc2.util.IO;
+import ucar.nc2.iosp.IOServiceProvider;
+import ucar.nc2.iosp.IospHelper;
 import ucar.nc2.iosp.netcdf3.N3header;
 import ucar.nc2.iosp.netcdf3.N3iosp;
 import ucar.nc2.iosp.netcdf3.SPFactory;
-import ucar.nc2.iosp.IOServiceProvider;
-import ucar.nc2.iosp.IospHelper;
+import ucar.nc2.util.*;
+import ucar.nc2.util.rc.RC;
+import ucar.unidata.io.InMemoryRandomAccessFile;
+import ucar.unidata.io.UncompressInputStream;
+import ucar.unidata.io.bzip2.CBZip2InputStream;
 import ucar.unidata.util.StringUtil2;
 
-import java.util.*;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
-import java.util.zip.GZIPInputStream;
-import java.net.URL;
-import java.net.URI;
 import java.io.*;
-import java.nio.channels.WritableByteChannel;
+import java.net.URI;
+import java.net.URL;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
+import java.nio.channels.WritableByteChannel;
+import java.util.*;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 /**
  * Read-only scientific datasets that are accessible through the netCDF API.
@@ -90,7 +86,7 @@ import java.nio.channels.OverlappingFileLockException;
  * @author caron
  */
 
-public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoCloseable {
+public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, Closeable {
   static public final String IOSP_MESSAGE_ADD_RECORD_STRUCTURE = "AddRecordStructure";
   static public final String IOSP_MESSAGE_CONVERT_RECORD_STRUCTURE = "ConvertRecordStructure"; // not implemented yet
   static public final String IOSP_MESSAGE_REMOVE_RECORD_STRUCTURE = "RemoveRecordStructure";
@@ -114,7 +110,7 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
     try {
       registerIOProvider("ucar.nc2.stream.NcStreamIosp");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class NcStreamIosp: {}", e);
     }
     try {
       registerIOProvider("ucar.nc2.iosp.netcdf3.UniplotN3iosp");
@@ -124,101 +120,101 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
     try {
       registerIOProvider("ucar.nc2.iosp.hdf5.H5iosp");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class H5iosp: {}", e);
     }
     try {
       registerIOProvider("ucar.nc2.iosp.hdf4.H4iosp");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class H4iosp: {}", e);
     }
 
         // LOOK can we just load Grib through the ServiceLoader ??
     try {
       registerIOProvider("ucar.nc2.grib.collection.Grib1Iosp");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class Grib1Iosp: {}", e);
     }
     try {
       registerIOProvider("ucar.nc2.grib.collection.Grib2Iosp");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class Grib2Iosp: {}", e);
     }
     try {
       Class iosp = NetcdfFile.class.getClassLoader().loadClass("ucar.nc2.iosp.bufr.BufrIosp2");
       registerIOProvider(iosp);
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load resource: " + e);
+      if (loadWarnings) log.info("Cant load resource: {}", e);
     }
 
     try {
       registerIOProvider("ucar.nc2.iosp.nexrad2.Nexrad2IOServiceProvider");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class Nexrad2IOServiceProvider: {}", e);
     }
     try {
       registerIOProvider("ucar.nc2.iosp.nids.Nidsiosp");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class Nidsiosp: {}", e);
     }
     try {
       registerIOProvider("ucar.nc2.iosp.nowrad.NOWRadiosp");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class NOWRadiosp: {}", e);
     }
     try {
       registerIOProvider("ucar.nc2.iosp.misc.GtopoIosp");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class GtopoIosp: {}", e);
     }
     try {
       registerIOProvider("ucar.nc2.iosp.misc.NmcObsLegacy");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class NmcObsLegacy: {}", e);
     }
     try {
       registerIOProvider("ucar.nc2.iosp.gini.Giniiosp");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class Giniiosp: {}", e);
     }
     try {
         registerIOProvider("ucar.nc2.iosp.sigmet.SigmetIOServiceProvider");
     } catch (Throwable e) {
-        if (loadWarnings) log.info("Cant load class: " + e);
+        if (loadWarnings) log.info("Cant load class SigmetIOServiceProvider: {}", e);
     }
     try {
       registerIOProvider("ucar.nc2.iosp.uf.UFiosp");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class UFiosp: {}", e);
     }
     try {
       registerIOProvider("ucar.nc2.iosp.misc.Uspln");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class Uspln: {}", e);
     }
     try {
       registerIOProvider("ucar.nc2.iosp.misc.Nldn");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class Nldn: {}", e);
     }
     try {
       registerIOProvider("ucar.nc2.iosp.fysat.Fysatiosp");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class Fysatiosp: {}", e);
     }
     try {
       registerIOProvider("ucar.nc2.iosp.uamiv.UAMIVServiceProvider");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class UAMIVServiceProvider: {}", e);
     }
     try {
       registerIOProvider("ucar.nc2.iosp.noaa.Ghcnm2");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class Ghcnm2: {}", e);
     }
     try {
       registerIOProvider("ucar.nc2.iosp.noaa.IgraPor");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class IgraPor: {}", e);
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -227,42 +223,42 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
     try {
       registerIOProvider("ucar.nc2.iosp.dmsp.DMSPiosp");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class: {}", e);
     }
     try {
       registerIOProvider("ucar.nc2.iosp.dorade.Doradeiosp");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class Doradeiosp: {}", e);
     }
     try {
       NetcdfFile.class.getClassLoader().loadClass("ucar.nc2.iosp.gempak.GempakSurfaceIOSP");
       registerIOProvider("ucar.nc2.iosp.gempak.GempakSurfaceIOSP");
       registerIOProvider("ucar.nc2.iosp.gempak.GempakSoundingIOSP");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class Gempak...: {}", e);
     }
     try {
       NetcdfFile.class.getClassLoader().loadClass("ucar.nc2.iosp.gempak.GempakGridServiceProvider");
       registerIOProvider("ucar.nc2.iosp.gempak.GempakGridServiceProvider");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class GempakGridServiceProvider: {}", e);
     }
-    /* try {
+    try {
       registerIOProvider("ucar.nc2.iosp.grads.GradsBinaryGridServiceProvider");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
-    } */
+      if (loadWarnings) log.info("Cant load class GradsBinaryGridServiceProvider: {}", e);
+    }
     try {
       NetcdfFile.class.getClassLoader().loadClass("ucar.nc2.iosp.mcidas.AreaServiceProvider");
       registerIOProvider("ucar.nc2.iosp.mcidas.AreaServiceProvider");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class AreaServiceProvider: {}", e);
     }
     try {
       NetcdfFile.class.getClassLoader().loadClass("ucar.nc2.iosp.mcidas.McIDASGridServiceProvider");
       registerIOProvider("ucar.nc2.iosp.mcidas.McIDASGridServiceProvider");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class McIDASGridServiceProvider: {}", e);
     }
 
     ////////////////////////////////
@@ -270,7 +266,7 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
     try {
       registerIOProvider("ucar.nc2.iosp.cinrad.Cinrad2IOServiceProvider");
     } catch (Throwable e) {
-      if (loadWarnings) log.info("Cant load class: " + e);
+      if (loadWarnings) log.info("Cant load class Cinrad2IOServiceProvider: {}", e);
     }
 
     userLoads = true;
@@ -462,7 +458,7 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
       Iterator<IOServiceProvider> iterator = ServiceLoader.load(IOServiceProvider.class).iterator(); // LOOK is this expensive ?
       while (iterator.hasNext()) {
         IOServiceProvider iosp = iterator.next();
-        System.out.printf("ServiceLoader IOServiceProvider %s%n", iosp.getClass().getName());
+        log.info("ServiceLoader IOServiceProvider {}", iosp.getClass().getName());
         if (iosp.isValidFile(raf)) {
           return true;
         }
@@ -530,11 +526,15 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
       buffer_size = default_buffersize;
 
     ucar.unidata.io.RandomAccessFile raf;
-    if (uriString.startsWith("http:")) { // open through URL
+    if (uriString.startsWith("http:") || uriString.startsWith("https:")) { // open through URL
       raf = new ucar.unidata.io.http.HTTPRandomAccessFile(uriString);
 
-    } else if (uriString.startsWith("nodods:")) { // open through URL
+    } else if (uriString.startsWith("nodods:")) { // deprecated use httpserver
       uriString = "http" + uriString.substring(6);
+      raf = new ucar.unidata.io.http.HTTPRandomAccessFile(uriString);
+
+    } else if (uriString.startsWith("httpserver:")) { // open through URL
+      uriString = "http" + uriString.substring(10);
       raf = new ucar.unidata.io.http.HTTPRandomAccessFile(uriString);
 
     } else if (uriString.startsWith("slurp:")) { // open through URL
@@ -555,7 +555,7 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
       try {
         uncompressedFileName = makeUncompressed(uriString);
       } catch (Exception e) {
-        log.warn("Failed to uncompress " + uriString + " err= " + e.getMessage() + "; try as a regular file.");
+        log.warn("Failed to uncompress {}, err= {}; try as a regular file.", uriString, e.getMessage());
         //allow to fall through to open the "compressed" file directly - may be a misnamed suffix
       }
 
@@ -609,7 +609,7 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
           }
         }
 
-        if (debugCompress) System.out.println("found uncompressed " + uncompressedFile + " for " + filename);
+        if (debugCompress) log.info("found uncompressed {} for {}", uncompressedFile, filename);
         return uncompressedFile.getPath();
       } finally {
         if (lock != null) lock.release();
@@ -623,7 +623,6 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
     if (!file.exists())
       return null; // bail out  */
 
-    InputStream in = null;
     try (FileOutputStream fout = new FileOutputStream(uncompressedFile)) {
 
       // obtain the lock
@@ -643,33 +642,37 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
 
       try {
         if (suffix.equalsIgnoreCase("Z")) {
-          in = new UncompressInputStream(new FileInputStream(filename));
-          copy(in, fout, 100000);
-          if (debugCompress) System.out.println("uncompressed " + filename + " to " + uncompressedFile);
+          try (InputStream in = new UncompressInputStream(new FileInputStream(filename))) {
+            copy(in, fout, 100000);
+          }
+          if (debugCompress) log.info("uncompressed {} to {}", filename, uncompressedFile);
 
         } else if (suffix.equalsIgnoreCase("zip")) {
-          ZipInputStream zin = new ZipInputStream(new FileInputStream(filename));
-          ZipEntry ze = zin.getNextEntry();
-          if (ze != null) {
-            in = zin;
-            copy(in, fout, 100000);
-            if (debugCompress)
-              System.out.println("unzipped " + filename + " entry " + ze.getName() + " to " + uncompressedFile);
+
+          try (ZipInputStream zin = new ZipInputStream(new FileInputStream(filename))) {
+            ZipEntry ze = zin.getNextEntry();
+            if (ze != null) {
+              copy(zin, fout, 100000);
+              if (debugCompress)
+                log.info("unzipped {} entry {} to {}", filename, ze.getName(), uncompressedFile);
+            }
           }
 
         } else if (suffix.equalsIgnoreCase("bz2")) {
-          in = new CBZip2InputStream(new FileInputStream(filename), true);
-          copy(in, fout, 100000);
-          if (debugCompress) System.out.println("unbzipped " + filename + " to " + uncompressedFile);
+          try (InputStream in = new CBZip2InputStream(new FileInputStream(filename), true)) {
+            copy(in, fout, 100000);
+          }
+          if (debugCompress) log.info("unbzipped {} to {}", filename, uncompressedFile);
 
         } else if (suffix.equalsIgnoreCase("gzip") || suffix.equalsIgnoreCase("gz")) {
 
-          in = new GZIPInputStream(new FileInputStream(filename));
-          copy(in, fout, 100000);
+          try (InputStream in = new GZIPInputStream(new FileInputStream(filename))) {
+            copy(in, fout, 100000);
+          }
 
-          if (debugCompress) System.out.println("ungzipped " + filename + " to " + uncompressedFile);
+          if (debugCompress) log.info("ungzipped {} to {}", filename, uncompressedFile);
         }
-      } catch (Exception e) {
+      }  catch (Exception e) {
 
         // appears we have to close before we can delete   LOOK
         //fout.close();
@@ -678,13 +681,12 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
         // dont leave bad files around
         if (uncompressedFile.exists()) {
           if (!uncompressedFile.delete())
-            log.warn("failed to delete uncompressed file (IOException)" + uncompressedFile);
+            log.warn("failed to delete uncompressed file (IOException) {}", uncompressedFile);
         }
         throw e;
 
       } finally {
         if (lock != null) lock.release();
-        if (in != null) in.close();
       }
     }
 
@@ -767,7 +769,7 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
                                  Object iospMessage) throws IOException {
 
     IOServiceProvider spi = null;
-    if (debugSPI) System.out.println("NetcdfFile try to open = " + location);
+    if (debugSPI) log.info("NetcdfFile try to open = {}", location);
 
     // avoid opening file more than once, so pass around the raf.
     if (N3header.isValidFile(raf)) {
@@ -795,7 +797,7 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
 
       // look for registered providers
       for (IOServiceProvider registeredSpi : registeredProviders) {
-        if (debugSPI) System.out.println(" try iosp = " + registeredSpi.getClass().getName());
+        if (debugSPI) log.info(" try iosp = {}", registeredSpi.getClass().getName());
 
         if (registeredSpi.isValidFile(raf)) {
           // need a new instance for thread safety
@@ -822,7 +824,7 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
       spi.sendIospMessage(iospMessage);
 
     if (log.isDebugEnabled())
-      log.debug("Using IOSP " + spi.getClass().getName());
+      log.debug("Using IOSP {}", spi.getClass().getName());
 
     NetcdfFile result = new NetcdfFile(spi, raf, location, cancelTask);
 
@@ -1009,7 +1011,7 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
    * @return Variable or null if not found.
    */
   public Variable findVariable(String fullNameEscaped) {
-    if (fullNameEscaped == null || fullNameEscaped.length() == 0) {
+    if (fullNameEscaped == null || fullNameEscaped.isEmpty()) {
       return null;
     }
 
@@ -1076,18 +1078,40 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
   }
 
   /**
-   * Retrieve a dimension by fullName.
+   * Finds a Dimension with the specified full name. It may be nested in multiple groups.
+   * An embedded "/" is interpreted as a group separator. A leading slash indicates the root group. That slash may be
+   * omitted, but the {@code fullName} will be treated as if it were there. In other words, the first name token in
+   * {@code fullName} is treated as the short name of a Group or Dimension, relative to the root group.
    *
-   * @param name dimension full name, (using parent group names if not in the root group)
-   * @return the dimension, or null if not found
+   * @param fullName  Dimension full name, e.g. "/group/subgroup/dim".
+   * @return  the Dimension or {@code null} if it wasn't found.
    */
-  public Dimension findDimension(String name) {
-    if (name == null) return null;
-    for (Dimension d : dimensions) {
-      if (name.equals(d.getShortName()))
-        return d;
+  public Dimension findDimension(String fullName) {
+    if (fullName == null || fullName.isEmpty()) {
+      return null;
     }
-    return null;
+
+    Group group = rootGroup;
+    String dimShortName = fullName;
+
+    // break into group/group and dim
+    int pos = fullName.lastIndexOf('/');
+    if (pos >= 0) {
+      String groups = fullName.substring(0, pos);
+      dimShortName = fullName.substring(pos + 1);
+
+      StringTokenizer stoke = new StringTokenizer(groups, "/");
+      while (stoke.hasMoreTokens()) {
+        String token = NetcdfFile.makeNameUnescaped(stoke.nextToken());
+        group = group.findGroup(token);
+
+        if (group == null) {
+          return null;
+        }
+      }
+    }
+
+    return group.findDimensionLocal(dimShortName);
   }
 
   /**
@@ -1456,7 +1480,7 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
 
     Class iospClass = getClass().getClassLoader().loadClass(iospClassName);
     spi = (IOServiceProvider) iospClass.newInstance();
-    if (debugSPI) System.out.println("NetcdfFile uses iosp = " + spi.getClass().getName());
+    if (debugSPI) log.info("NetcdfFile uses iosp = {}", spi.getClass().getName());
     if (iospParam != null) spi.sendIospMessage(iospParam);
 
     this.location = location;
@@ -1524,7 +1548,7 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
     this.spi = spi;
     this.location = location;
 
-    if (debugSPI) System.out.println("NetcdfFile uses iosp = " + spi.getClass().getName());
+    if (debugSPI) log.info("NetcdfFile uses iosp = {}", spi.getClass().getName());
 
     try {
       spi.open(raf, this, cancelTask);
@@ -1897,14 +1921,19 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
     variables = new ArrayList<>();
     gattributes = new ArrayList<>();
     dimensions = new ArrayList<>();
-    if (rootGroup == null)
-      rootGroup = makeRootGroup(); //  only make the root group once
+    rootGroup = makeRootGroup();
     // addedRecordStructure = false;
   }
 
   protected Group makeRootGroup() {
     Group root = new Group(this, null, "");
+
+    // The value of rootGroup will be queried during the course of setParentGroup.
+    // If there's an existing rootGroup that we're trying to replace, it's important that the value of the
+    // field be null for that.
+    rootGroup = null;
     root.setParentGroup(null);
+
     return root;
   }
 
@@ -1970,7 +1999,7 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
   protected Array readData(ucar.nc2.Variable v, Section ranges) throws IOException, InvalidRangeException {
     long start = 0;
     if (showRequest) {
-      System.out.printf("Data request for variable: %s section %s", v.getFullName(), ranges);
+      log.info("Data request for variable: {} section {}...", v.getFullName(), ranges);
       start = System.currentTimeMillis();
     }
 
@@ -1987,7 +2016,7 @@ public class NetcdfFile implements ucar.nc2.util.cache.FileCacheable, AutoClosea
 
     if (showRequest) {
       long took = System.currentTimeMillis() - start;
-      System.out.printf(" took= %d msecs%n", took);
+      log.info(" ...took= {} msecs", took);
     }
     return result;
   }

@@ -34,6 +34,8 @@
 package thredds.servlet;
 
 import java.io.*;
+import java.nio.channels.Channels;
+import java.nio.channels.WritableByteChannel;
 import java.util.*;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -620,9 +622,11 @@ public class ServletUtil {
 
       // Return the file
       ServletOutputStream out = res.getOutputStream();
-      IO.copyFileB(file, out, 60000);
-      res.flushBuffer();
-      out.close();
+      IO.copyFileB(file, out, 60 * 1000);
+      /* try (WritableByteChannel cOut = Channels.newChannel(out)) {
+        IO.copyFileWithChannels(file, cOut);
+        res.flushBuffer();
+      } */
       if (debugRequest) log.debug("returnFile(): returnFile ok = " + filename);
     }
 
@@ -640,6 +644,11 @@ public class ServletUtil {
       String eName = e.getClass().getName(); // dont want compile time dependency on ClientAbortException
       if (eName.equals("org.apache.catalina.connector.ClientAbortException")) {
         log.debug("returnFile(): ClientAbortException while sending file: " + filename + " " + e.getMessage());
+        return;
+      }
+
+      if (e.getMessage().startsWith("File transfer not complete")) { // coming from FileTransfer.transferTo()
+        log.debug("returnFile() "+e.getMessage());
         return;
       }
 
@@ -667,6 +676,20 @@ public class ServletUtil {
       log.error(" IOException sending string: ", e);
       res.sendError(HttpServletResponse.SC_NOT_FOUND, "Problem sending string: " + e.getMessage());
     }
+  }
+
+  /**
+   * Set the proper content length for the string
+   *
+   * @param response the HttpServletResponse to act upon
+   * @param s the string that will be returned
+   * @return the number of bytes
+   * @throws UnsupportedEncodingException on bad character encoding
+   */
+  public static int setResponseContentLength(HttpServletResponse response, String s) throws UnsupportedEncodingException {
+    int length = s.getBytes(response.getCharacterEncoding()).length;
+    response.setContentLength(length);
+    return length;
   }
 
   /**

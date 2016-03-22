@@ -1,8 +1,9 @@
 package dap4.test;
 
-import dap4.test.servlet.*;
-import dap4.test.util.DapTestCommon;
 
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 
 /**
  * TestFrontPage verifies the front page
@@ -21,7 +22,7 @@ public class TestDSR extends DapTestCommon
     static protected String BASELINEDIR = DATADIR + "/resources/TestDSR/baseline";
 
     // constants for Fake Request
-    static protected final String FAKEDATASET = "test1"; 
+    static protected final String FAKEDATASET = "test1";
     static protected String FAKEURL = "http://localhost:8080/d4ts/" + FAKEDATASET;
 
     //////////////////////////////////////////////////
@@ -32,24 +33,9 @@ public class TestDSR extends DapTestCommon
     protected String root = null;
 
     //////////////////////////////////////////////////
-    // Constructor(s)
 
-    public TestDSR()
-        throws Exception
-    {
-        this("TestDSR");
-    }
-
-    public TestDSR(String name)
-        throws Exception
-    {
-        this(name, null);
-    }
-
-    public TestDSR(String name, String[] argv)
-        throws Exception
-    {
-        super(name);
+    @Before
+    public void setup() throws Exception {
         this.root = getDAP4Root();
         if(this.root == null)
             throw new Exception("dap4 root not found");
@@ -59,38 +45,33 @@ public class TestDSR extends DapTestCommon
     //////////////////////////////////////////////////
     // Junit test methods
 
+    @Test
     public void testDSR()
         throws Exception
     {
         boolean pass = true;
-
-        // Create request and response objects
-        FakeServlet servlet = new FakeServlet(this.datasetpath);
         String url = FAKEURL; // no file specified
-        FakeServletRequest req = new FakeServletRequest(url, servlet);
-        FakeServletResponse resp = new FakeServletResponse();
 
-        // See if the servlet can process this
+        Mocker mocker = new Mocker("d4ts", url, this);
+        byte[] byteresult = null;
+
         try {
-            servlet.init();
-            servlet.doGet(req, resp);
+            byteresult = mocker.execute();
         } catch (Throwable t) {
             t.printStackTrace();
-            assertTrue(false);
+            throw t;
         }
-        // Collect the output
-        FakeServletOutputStream fakestream = (FakeServletOutputStream) resp.getOutputStream();
-        byte[] byteresult = fakestream.toArray();
 
         // Convert the raw output to a string
-        String dsr = new String(byteresult,UTF8);
+        String dsr =
+                new String(byteresult, UTF8);
 
         if(prop_visual)
             visual("TestDSR", dsr);
 
         // Figure out the baseline
         String baselinepath = this.root + "/" + BASELINEDIR + "/" + FAKEDATASET + ".dsr";
-	
+
         if(prop_baseline) {
             writefile(baselinepath, dsr);
         } else if(prop_diff) { //compare with baseline
@@ -100,7 +81,7 @@ public class TestDSR extends DapTestCommon
             pass = compare(baselinecontent, dsr);
             System.out.println(pass ? "Pass" : "Fail");
         }
-        assertTrue(pass);
+        Assert.assertTrue(pass);
     }
 
     //////////////////////////////////////////////////

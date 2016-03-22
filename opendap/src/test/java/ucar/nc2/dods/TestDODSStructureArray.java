@@ -32,16 +32,30 @@
  */
 package ucar.nc2.dods;
 
+import java.io.IOException;
+
 import opendap.test.TestSources;
 import org.junit.Test;
-import ucar.ma2.*;
-import ucar.nc2.*;
+import org.junit.experimental.categories.Category;
+import ucar.ma2.Array;
+import ucar.ma2.ArrayInt;
+import ucar.ma2.ArrayShort;
+import ucar.ma2.ArrayStructure;
+import ucar.ma2.DataType;
+import ucar.ma2.Index;
+import ucar.ma2.IndexIterator;
+import ucar.ma2.InvalidRangeException;
+import ucar.ma2.StructureData;
+import ucar.ma2.StructureMembers;
+import ucar.nc2.NetcdfFile;
+import ucar.nc2.Structure;
+import ucar.nc2.Variable;
 import ucar.nc2.dataset.NetcdfDataset;
-
-import java.io.*;
+import ucar.unidata.test.util.NeedsExternalResource;
+import ucar.unidata.test.util.UtilsTestStructureArray;
 
 /** Test nc2 dods in the JUnit framework. */
-
+@Category(NeedsExternalResource.class)
 public class TestDODSStructureArray {
 
   @Test
@@ -201,7 +215,7 @@ public class TestDODSStructureArray {
     assert( data instanceof ArrayStructure);
     assert(data.getElementType() == StructureData.class);
 
-    new ucar.unidata.test.ma2.TestStructureArray().testArrayStructure( (ArrayStructure) data);
+    new UtilsTestStructureArray().testArrayStructure( (ArrayStructure) data);
     ncfile.close();
   }
 

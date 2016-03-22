@@ -1,16 +1,52 @@
 // Gradle dependency managment.
 // This technique was inspired by: http://stackoverflow.com/questions/9547170
 
+//================================================ Repositories ================================================//
+
+allprojects {  // Doesn't apply any plugins: safe to run closure on all projects.
+    // TODO: Specify preferred repository with each dependency definition (although, have a sensible default).
+    // Then, based on the declared dependencies, automatically add the necessary repos, and ONLY the necessary repos.
+    repositories {
+        mavenCentral()
+        maven {
+            // JitPack builds GitHub projects on demand and publishes ready-to-use packages.
+            // We need this because Spock requires CGLIB 3.2+ in order to work on Java 8.
+            // However, as of 2015-08-26, v3.2 hasn't been released, even though working code exists on master.
+            // So, using JitPack, we're going to grab an appropriate CGLIB artifact.
+            // See https://github.com/cglib/cglib/issues/32
+            url "https://jitpack.io"  // For libraries["cglib-nodep"]
+        }
+        maven {
+            url "https://artifacts.unidata.ucar.edu/content/repositories/unidata"
+        }
+        maven {
+            url "https://artifacts.unidata.ucar.edu/content/repositories/unidata-3rdparty/"
+        }
+    }
+}
+
+//================================================ Dependencies ================================================//
+
 ext {
-    // Extra properties must be declared in the "ext" namespace.
-    // After declaration, they can be used without prefix.
+    // Extra properties must be declared in the "ext" namespace. After declaration, they can be used without prefix.
+    // These will be inherited by subprojects.
     versions = [:]
     libraries = [:]
 }
 
+////////////////////////////////////////// Plugins //////////////////////////////////////////
+
+libraries["gretty"] = "org.akhikhl.gretty:gretty:1.2.0"
+
+libraries["shadow"] = "com.github.jengelman.gradle.plugins:shadow:1.2.2"
+
+libraries["coveralls-gradle-plugin"] = "org.kt3k.gradle.plugin:coveralls-gradle-plugin:2.3.1"
+
+libraries["gradle-extra-configurations-plugin"] = "com.netflix.nebula:gradle-extra-configurations-plugin:2.2.1"
+
 ////////////////////////////////////////// Spring //////////////////////////////////////////
 
-versions["spring"] = "3.2.12.RELEASE"
+versions["spring"] = "4.1.6.RELEASE"
 
 libraries["spring-core"] = "org.springframework:spring-core:${versions["spring"]}"
 
@@ -34,9 +70,9 @@ libraries["spring-security-taglibs"] = "org.springframework.security:spring-secu
 
 libraries["xmlbeans"] = "org.apache.xmlbeans:xmlbeans:2.6.0"
 
-libraries["52n-oxf-xmlbeans"] = "org.n52.sensorweb:52n-oxf-xmlbeans:1.12"
+libraries["52n-oxf-xmlbeans"] = "org.n52.sensorweb:52n-oxf-xmlbeans:2.0.0-alpha.3.3"
 
-versions["52n-common-xml"] = "1.1.5"
+versions["52n-common-xml"] = "2.1.0"
 
 libraries["52n-xml-waterML-v20"] = "org.n52.sensorweb:52n-xml-waterML-v20:${versions["52n-common-xml"]}"
 
@@ -58,11 +94,13 @@ libraries["slf4j-jdk14"] = "org.slf4j:slf4j-jdk14:${versions["slf4j"]}"
 
 libraries["jcl-over-slf4j"] = "org.slf4j:jcl-over-slf4j:${versions["slf4j"]}"
 
-versions["log4j"] = "2.0-rc1"
+versions["log4j"] = "2.2"
 
 libraries["log4j-api"] = "org.apache.logging.log4j:log4j-api:${versions["log4j"]}"
 
 libraries["log4j-core"] = "org.apache.logging.log4j:log4j-core:${versions["log4j"]}"
+
+libraries["log4j-web"] = "org.apache.logging.log4j:log4j-web:${versions["log4j"]}"
 
 libraries["log4j-slf4j-impl"] = "org.apache.logging.log4j:log4j-slf4j-impl:${versions["log4j"]}"
 
@@ -78,6 +116,19 @@ libraries["com.eclipsesource.restfuse"] = "com.restfuse:com.eclipsesource.restfu
 
 libraries["httpunit"] = "httpunit:httpunit:1.7"
 
+// These four are all for Spock.
+
+libraries["spock-core"] = "org.spockframework:spock-core:1.0-groovy-2.4"
+
+libraries["groovy-all"] = "org.codehaus.groovy:groovy-all:2.4.5"
+
+// In Spock, allows mocking of classes (in addition to interfaces).
+// 5503bcca74 is the most recent commit on the cglib master branch as of 2015-08-26.
+libraries["cglib-nodep"] = "com.github.cglib.cglib:cglib-nodep:5503bcca74"
+
+// In Spock, allows mocking of classes without default constructor (together with CGLIB).
+libraries["objenesis"] = "org.objenesis:objenesis:2.2"
+
 ////////////////////////////////////////// Other //////////////////////////////////////////
 
 // See https://github.com/coverity/coverity-security-library
@@ -87,10 +138,13 @@ libraries["bounce"] = "org.bounce:bounce:0.14"
 
 libraries["imgscalr-lib"] = "org.imgscalr:imgscalr-lib:4.2"
 
-libraries["httpclient"] = "org.apache.httpcomponents:httpclient:4.2.6"
+libraries["httpclient"] = "org.apache.httpcomponents:httpclient:4.5.1"
 
-libraries["httpcore"] = "org.apache.httpcomponents:httpcore:4.2.5"
+libraries["httpcore"] = "org.apache.httpcomponents:httpcore:4.4.4"
 
+libraries["httpmime"] = "org.apache.httpcomponents:httpmime:4.5.1"
+
+// Old and crufty. Only used by TdsMonitor in :ui. Can we switch to Guava caches?
 libraries["ehcache-core"] = "net.sf.ehcache:ehcache-core:2.6.2"
 
 libraries["jcip-annotations"] = "net.jcip:jcip-annotations:1.0"
@@ -101,7 +155,7 @@ libraries["je"] = "com.sleepycat:je:4.0.92"
 
 libraries["jna"] = "net.java.dev.jna:jna:4.1.0"
 
-libraries["joda-time"] = "joda-time:joda-time:2.2"
+libraries["joda-time"] = "joda-time:joda-time:2.8.1"
 
 libraries["jsoup"] = "org.jsoup:jsoup:1.7.2"
 
@@ -117,9 +171,7 @@ libraries["commons-lang3"] = "org.apache.commons:commons-lang3:3.3.2"
 
 libraries["guava"] = "com.google.guava:guava:18.0"
 
-libraries["jj2000"] = "edu.ucar:jj2000:5.2"
-
-libraries["bzip2"] = "org.itadaki:bzip2:0.9.1"
+libraries["jj2000"] = "edu.ucar:jj2000:5.3"
 
 libraries["xz"] = "org.tukaani:xz:1.0"
 
@@ -137,11 +189,11 @@ libraries["commons-compress"] = "org.apache.commons:commons-compress:1.8.1"
 
 libraries["oro"] = "oro:oro:2.0.8"
 
-libraries["ncwms"] = dependencies.create("uk.ac.rdg.resc:ncwms:1.2.tds.4.6.0-SNAPSHOT") {
+libraries["ncwms"] = dependencies.create("uk.ac.rdg.resc:ncwms:1.2.tds.4.6.5-SNAPSHOT") {
     // This is an external dependency on an old artifact of ours.
     // The "cdm" artifact that we build in this project will take its place.
     // This needs to be a local exclusion; globally excluding "edu.ucar:cdm" would be very bad.
-    exclude group: 'edu.ucar', module: 'cdm'  // version "4.6.0-SNAPSHOT"
+    exclude group: 'edu.ucar', module: 'cdm'  // version "4.6.1"
 }
 
 libraries["geoapi-pending"] = "org.opengis:geoapi-pending:3.1-M04"
@@ -156,12 +208,15 @@ libraries["hibernate-validator"] = "org.hibernate:hibernate-validator:4.3.1.Fina
 
 libraries["jaxen"] = "jaxen:jaxen:1.1.4"
 
-libraries["threddsIso"] = "EDS:threddsIso:2.2.5-SNAPSHOT"
+libraries["threddsIso"] = "EDS:threddsIso:2.2.8"
 
+libraries["aws-java-sdk-s3"] = "com.amazonaws:aws-java-sdk-s3:1.10.11"
 
-//////////////////////// Global transitive dependency replacements and exclusions ////////////////////////
+//////////////////////////// Transitive dependency replacements and exclusions ////////////////////////////
 
-subprojects {
+allprojects {  // Doesn't apply any plugins: safe to run closure on all projects.
+    // Executes the given closure against all objects in this collection, and any objects subsequently added to this
+    // collection. See org.gradle.api.DomainObjectCollection.all(Closure)
     configurations.all {
         // Replace every instance of "commons-logging" in the dependency tree with "jcl-over-slf4j".
         // This effectively converts every jcl call to an slf4j call.
@@ -189,17 +244,10 @@ subprojects {
         // and we don't use the "tidy" functionality (i.e. HTML pretty printing) anyway.
         // Dragged in by httpunit.
         exclude group: 'jtidy', module: 'jtidy'
-    }
-}
 
-
-//////////////////////// Global dependencies ////////////////////////
-
-subprojects {
-    apply plugin: 'java'  // Need this for the testCompile configuration.
-
-    dependencies {
-        // All subprojects use JUnit for their tests.
-        testCompile libraries["junit"]
+        // On TDS startup, I'm getting "Class path contains multiple SLF4J bindings" warnings.
+        // This is one of those bindings. Strangely, I have NO idea what dependency is dragging it in.
+        // It doesn't matter though; we always want to see the logging messages.
+        exclude group: 'org.slf4j', module: 'slf4j-nop'
     }
 }

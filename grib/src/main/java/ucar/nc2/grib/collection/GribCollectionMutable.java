@@ -40,6 +40,9 @@ import thredds.featurecollection.FeatureCollectionConfig;
 import thredds.inventory.CollectionAbstract;
 import thredds.inventory.MFile;
 import ucar.coord.*;
+import ucar.nc2.grib.GdsHorizCoordSys;
+import ucar.nc2.grib.GribIndexCache;
+import ucar.nc2.grib.GribTables;
 import ucar.nc2.grib.grib1.Grib1Gds;
 import ucar.nc2.grib.grib1.Grib1ParamTime;
 import ucar.nc2.grib.grib1.Grib1SectionProductDefinition;
@@ -49,13 +52,13 @@ import ucar.nc2.grib.grib2.*;
 import ucar.nc2.grib.grib2.table.Grib2Customizer;
 import ucar.nc2.time.CalendarDate;
 import ucar.nc2.time.CalendarDateFormatter;
-import ucar.nc2.time.CalendarTimeZone;
-import ucar.nc2.grib.*;
 import ucar.nc2.time.CalendarDateRange;
+import ucar.nc2.time.CalendarTimeZone;
 import ucar.unidata.io.RandomAccessFile;
 import ucar.unidata.util.Parameter;
 import ucar.unidata.util.StringUtil2;
 
+import java.io.Closeable;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -67,7 +70,7 @@ import java.util.*;
  * @author John
  * @since 12/1/13
  */
-public class GribCollectionMutable implements AutoCloseable {
+public class GribCollectionMutable implements Closeable {
   static private final org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger(GribCollectionMutable.class);
   static public final long MISSING_RECORD = -1;
 
@@ -409,7 +412,10 @@ public class GribCollectionMutable implements AutoCloseable {
       if (varMap == null) {
         varMap = new HashMap<>(variList.size() * 2);
         for (VariableIndex vi : variList) {
-          varMap.put(vi, vi);
+          VariableIndex old = varMap.put(vi, vi);
+          if (old != null) {
+            logger.error("GribCollectionMutable has duplicate variable hash {} == {}", vi, old);
+          }
           //System.out.printf("%s%n", vi.hashCode());
         }
       }
@@ -515,7 +521,7 @@ public class GribCollectionMutable implements AutoCloseable {
         this.tableVersion = pds.getTableVersion();
         this.parameter = pds.getParameterNumber();
         this.levelType = pds.getLevelType();
-        Grib1ParamTime ptime = new Grib1ParamTime(cust, pds);
+        Grib1ParamTime ptime = cust.getParamTime(pds);
         if (ptime.isInterval()) {
           this.intvType = pds.getTimeRangeIndicator();
         } else {
@@ -784,7 +790,6 @@ public class GribCollectionMutable implements AutoCloseable {
       }
       f.format("%n");
     }
-
   }
 
   @Override
@@ -804,6 +809,10 @@ public class GribCollectionMutable implements AutoCloseable {
     sb.append("\n backProcessId=").append(backProcessId);
     sb.append("\n}");
     return sb.toString();
+  }
+
+  public String showLocation() {
+    return "name="+name+" directory="+directory;
   }
 
   public GroupGC makeGroup() {

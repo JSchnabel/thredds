@@ -34,6 +34,7 @@
 package thredds.server.admin;
 
 import java.io.PrintWriter;
+import java.io.UnsupportedEncodingException;
 import java.util.*;
 
 import javax.annotation.PostConstruct;
@@ -51,12 +52,14 @@ import org.springframework.web.servlet.ModelAndView;
 
 import thredds.catalog.InvDatasetFeatureCollection;
 import thredds.featurecollection.FeatureCollectionConfig;
+import thredds.featurecollection.FeatureCollectionType;
 import thredds.inventory.*;
 import thredds.monitor.FmrcCacheMonitorImpl;
 import thredds.server.config.TdsContext;
 import thredds.servlet.DataRootHandler;
 import thredds.util.ContentType;
 import thredds.util.TdsPathUtils;
+import ucar.nc2.constants.CDM;
 import ucar.unidata.util.StringUtil2;
 
 /**
@@ -150,11 +153,11 @@ public class CollectionController  {
     act = new DebugController.Action("showFmrcCache", "Show FMRC Cache") {
       public void doAction(DebugController.Event e) {
         e.pw.println("<p>cache location = "+monitor.getCacheLocation()+"<p>");
-        String statUrl = tdsContext.getContextPath() + PATH + "/"+STATISTICS;
+        String statUrl = tdsContext.getContextPath() + FMRC_PATH + "/"+STATISTICS;
         e.pw.println("<p/> <a href='" + statUrl + "'>Show Cache Statistics</a>");
         for (String name : monitor.getCachedCollections()) {
           String ename = StringUtil2.quoteHtmlContent(name);
-          String url = tdsContext.getContextPath() + PATH + "?"+COLLECTION+"="+ename;
+          String url = tdsContext.getContextPath() + FMRC_PATH + "?"+COLLECTION+"="+ename;
           e.pw.println("<p/> <a href='" + url + "'>" + name + "</a>");
         }
       }
@@ -188,7 +191,30 @@ public class CollectionController  {
       String uriParam = Escape.uriParam(fc.getCollectionName());
       String url = tdsContext.getContextPath() + PATH + "?" + COLLECTION + "=" + uriParam;
       pw.printf("<p/><a href='%s'>%s</a>%n", url, fc.getName());
-      pw.printf("<pre>%s</pre>%n", fc.showStatusShort());
+      pw.printf("<pre>%s</pre>%n", fc.showStatusShort("txt"));
+    }
+    return null;
+  }
+
+  @RequestMapping(value={"/collection/showStatus.csv"})
+  protected ModelAndView handleCollectionStatusCsv(HttpServletRequest req, HttpServletResponse res) throws Exception {
+    res.setContentType(ContentType.csv.getContentHeader());
+    PrintWriter pw = res.getWriter();
+
+   // get sorted list of collections
+    List<InvDatasetFeatureCollection> fcList = DataRootHandler.getInstance().getFeatureCollections();
+    Collections.sort(fcList, new Comparator<InvDatasetFeatureCollection>() {
+      public int compare(InvDatasetFeatureCollection o1, InvDatasetFeatureCollection o2) {
+        int compareType = o1.getConfig().type.toString().compareTo(o1.getConfig().type.toString());
+        if (compareType != 0) return compareType;
+        return o1.getName().compareTo(o2.getName());
+      }
+    });
+
+    pw.printf("%s, %s, %s, %s, %s, %s, %s, %s%n", "collection", "type", "group", "nrecords", "ndups", "%", "nmiss", "%");
+    for (InvDatasetFeatureCollection fc : fcList) {
+      if (fc.getConfig().type != FeatureCollectionType.GRIB1 && fc.getConfig().type != FeatureCollectionType.GRIB2) continue;
+      pw.printf("%s", fc.showStatusShort("csv"));
     }
     return null;
   }
@@ -271,13 +297,13 @@ public class CollectionController  {
 
   /////////////////////////////////////////////////////////////
   // old FmrcController - deprecated
-  private static final String FMRC_PATH = "/admin/fmrcCache";
+  private static final String FMRC_PATH = "/admin/showFmrc";
   private static final String STATISTICS = "cacheStatistics.txt";
   private static final String CMD = "cmd";
   private static final String FILE = "file";
   private final FmrcCacheMonitorImpl monitor = new FmrcCacheMonitorImpl();
 
-  @RequestMapping(value={"/fmrcCache", "/fmrcCache/*"})
+  @RequestMapping(value={"/showFmrc", "/showFmrc/*"})
   protected ModelAndView showFmrcCache(HttpServletRequest req, HttpServletResponse res) throws Exception {
     String path = TdsPathUtils.extractPath(req, "admin/");   // LOOK probably wrong
 
@@ -298,7 +324,8 @@ public class CollectionController  {
 
     // show the file
     if (fileName != null) {
-      String contents = monitor.getCachedFile(collectName, fileName);
+      String ufilename = java.net.URLDecoder.decode(fileName, CDM.UTF8);
+      String contents = monitor.getCachedFile(collectName, ufilename);
       if (null == contents) {
         res.setContentType(ContentType.html.getContentHeader());
         PrintWriter pw = res.getWriter();
@@ -327,8 +354,8 @@ public class CollectionController  {
 
       pw.println("<ol>");
       for (String filename : monitor.getFilesInCollection(collectName)) {
-        String efileName = Escape.html(filename);
-        pw.println("<li> <a href='" + url + "&"+FILE+"="+efileName + "'>" + efileName + "</a>");
+        String efileName = java.net.URLEncoder.encode(filename, CDM.UTF8);
+        pw.println("<li> <a href='" + url + "&"+FILE+"="+efileName + "'>" + filename + "</a>");
       }
      pw.println("</ol>");
     }
@@ -349,5 +376,6 @@ public class CollectionController  {
 
     return null;
   }
+
 
 }

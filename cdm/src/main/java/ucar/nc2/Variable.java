@@ -57,8 +57,14 @@ import java.nio.channels.WritableByteChannel;
  * @see ucar.ma2.Array
  * @see ucar.ma2.DataType
  */
-
 public class Variable extends CDMNode implements VariableIF, ProxyReader, AttributeContainer {
+  /**
+   * Globally permit or prohibit caching. For use during testing and debugging.
+   * <p>
+   * A {@code true} value for this field does not indicate whether a Variable
+   * {@link #isCaching() is caching}, only that it's <i>permitted</i> to cache.
+   */
+  static public boolean permitCaching = true;
 
   static public final int defaultSizeToCache = 4000; // bytes  cache any variable whose size() < defaultSizeToCache
   static public final int defaultCoordsSizeToCache = 40 * 1000; // bytes cache coordinate variable whose size() < defaultSizeToCache
@@ -1459,7 +1465,8 @@ public class Variable extends CDMNode implements VariableIF, ProxyReader, Attrib
     if (immutable) throw new IllegalStateException("Cant modify");
     this.dimensions = new ArrayList<>();
     for (int i = 0; i < shape.length; i++) {
-      if ((shape[i] < 1) && (shape[i] != -1)) throw new InvalidRangeException("shape[" + i + "]=" + shape[i] + " must be > 0");
+      if ((shape[i] < 1) && (shape[i] != -1))
+        throw new InvalidRangeException("shape[" + i + "]=" + shape[i] + " must be > 0");
       Dimension anon;
       if (shape[i] == -1) {
         anon = Dimension.VLEN;
@@ -1584,10 +1591,16 @@ public class Variable extends CDMNode implements VariableIF, ProxyReader, Attrib
   /**
    * Will this Variable be cached when read.
    * Set externally, or calculated based on total size < sizeToCache.
+   * <p>
+   * This will always return {@code false} if {@link #permitCaching caching isn't permitted}.
    *
    * @return true is caching
    */
   public boolean isCaching() {
+    if (!permitCaching) {
+      return false;
+    }
+
     if (!this.cache.cachingSet) {
       cache.isCaching = !isVariableLength && (getSize() * getElementSize() < getSizeToCache());
       if (debugCaching) System.out.printf("  cache %s %s %d < %d%n", getFullName(), cache.isCaching, getSize() * getElementSize(), getSizeToCache());

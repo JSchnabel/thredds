@@ -53,7 +53,7 @@ import java.util.List;
 public class TimedCollection {
   private static final boolean debug = false;
 
-  private final MCollection manager;
+  private final MFileCollectionManager manager;
   private List<TimedCollection.Dataset> datasets;
   private CalendarDateRange dateRange;
 
@@ -65,7 +65,7 @@ public class TimedCollection {
    * @see CollectionSpecParser
    * @throws java.io.IOException on read error
    */
-  public TimedCollection(MCollection manager, Formatter errlog) throws IOException {
+  public TimedCollection(MFileCollectionManager manager, Formatter errlog) throws IOException {
     this.manager = manager;
 
     // get the inventory, sorted by path
@@ -84,8 +84,9 @@ public class TimedCollection {
 
   }
 
-  public void update() throws IOException {
+  public CalendarDateRange update() throws IOException {
     datasets = new ArrayList<>();
+    manager.scan(false);
     for (MFile f :  manager.getFilesSorted())
       datasets.add(new Dataset(f));
 
@@ -111,6 +112,7 @@ public class TimedCollection {
         dateRange = CalendarDateRange.of(first.getDateRange().getStart(), last.getDateRange().getEnd());
       }
     }
+    return dateRange;
   }
 
   private TimedCollection(TimedCollection from, CalendarDateRange want) {
@@ -191,7 +193,7 @@ public class TimedCollection {
   //////////////////////////////////////////////////////////////////////////
   // debugging
   private static void doit(String spec, Formatter errlog) throws IOException {
-    CollectionManager dcm = MFileCollectionManager.open("test", spec, null, errlog);
+    MFileCollectionManager dcm = MFileCollectionManager.open("test", spec, null, errlog);
     TimedCollection specp = new TimedCollection(dcm, errlog);
     System.out.printf("spec= %s%n%s%n", spec, specp);
     String err = errlog.toString();

@@ -62,11 +62,10 @@ import java.util.regex.Pattern;
 /**
  * Abstract superclass for Feature Collection InvDatasets.
  * This is a InvCatalogRef subclass. So the reference is placed in the parent, but
- * the catalog itself isnt constructed until the following call from DataRootHandler.makeDynamicCatalog():
- * match.dataRoot.featCollection.makeCatalog(match.remaining, path, baseURI);
+ *  the catalog itself isnt constructed until the following call from DataRootHandler.makeDynamicCatalog():
+ *   match.dataRoot.featCollection.makeCatalog(match.remaining, path, baseURI);
  * <p/>
- * The InvDatasetFeatureCollection object is created once and held in the DataRootHandler's collection
- * of DataRoots.
+ * The InvDatasetFeatureCollection object is created once and held in the DataRootHandler's collection of DataRoots.
  *
  * @author caron
  * @since Mar 3, 2010
@@ -177,7 +176,7 @@ public abstract class InvDatasetFeatureCollection extends InvCatalogRef implemen
   protected final FeatureCollectionType fcType;
   protected final FeatureCollectionConfig config;
   protected String topDirectory;
-  protected MCollection datasetCollection; // defines the collection of datasets in this feature collection, actually final NOT USED BY GRIB
+  protected MFileCollectionManager datasetCollection; // defines the collection of datasets in this feature collection, actually final NOT USED BY GRIB
 
   @GuardedBy("lock")
   protected State state;
@@ -199,11 +198,13 @@ public abstract class InvDatasetFeatureCollection extends InvCatalogRef implemen
   protected void makeCollection() {
 
     Formatter errlog = new Formatter();
-    if (config.spec.startsWith(MFileCollectionManager.CATALOG)) { // LOOK CHANGE THIS
+    datasetCollection = new MFileCollectionManager(config, errlog, this.logger);
+
+    /*if (config.spec != null && config.spec.startsWith(MFileCollectionManager.CATALOG)) { // LOOK CHANGE THIS
       datasetCollection = new CollectionManagerCatalog(config.collectionName, config.spec, null, errlog);
     } else {
       datasetCollection = new MFileCollectionManager(config, errlog, this.logger);
-    }
+    } */
     topDirectory = datasetCollection.getRoot();
     String errs = errlog.toString();
     if (errs.length() > 0) logger.warn("MFileCollectionManager parse error = {} ", errs);
@@ -233,7 +234,7 @@ public abstract class InvDatasetFeatureCollection extends InvCatalogRef implemen
   public void showStatus(Formatter f) {
     try {
       checkState();
-      _showStatus(f, false);
+      _showStatus(f, false, null);
 
     } catch (Throwable t) {
       StringWriter sw = new StringWriter(5000);
@@ -242,11 +243,11 @@ public abstract class InvDatasetFeatureCollection extends InvCatalogRef implemen
     }
   }
 
-  public String showStatusShort() {
+  public String showStatusShort(String type) {
     Formatter f = new Formatter();
     try {
       checkState();
-      _showStatus(f, true);
+      _showStatus(f, true, type);
 
     } catch (Throwable t) {
       StringWriter sw = new StringWriter(5000);
@@ -257,7 +258,7 @@ public abstract class InvDatasetFeatureCollection extends InvCatalogRef implemen
     return f.toString();
   }
 
-  protected void _showStatus(Formatter f, boolean summaryOnly) throws IOException {
+  protected void _showStatus(Formatter f, boolean summaryOnly, String type) throws IOException {
   }
 
   // localState is synched, may be directly changed

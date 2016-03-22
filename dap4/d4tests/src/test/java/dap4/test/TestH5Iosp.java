@@ -1,14 +1,22 @@
 package dap4.test;
 
-import dap4.test.util.DapTestCommon;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import ucar.nc2.dataset.NetcdfDataset;
+import ucar.unidata.test.util.NotJenkins;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.StringWriter;
 import java.math.BigInteger;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 
+
+@Category(NotJenkins.class)
 public class TestH5Iosp extends DapTestCommon
 {
     static protected final boolean DEBUG = false;
@@ -73,24 +81,8 @@ public class TestH5Iosp extends DapTestCommon
     protected String root = null;
 
     //////////////////////////////////////////////////
-    // Constructor(s)
-
-    public TestH5Iosp()
-        throws Exception
-    {
-        this("TestServlet");
-    }
-
-    public TestH5Iosp(String name)
-        throws Exception
-    {
-        this(name, null);
-    }
-
-    public TestH5Iosp(String name, String[] argv)
-        throws Exception
-    {
-        super(name);
+    @Before
+    public void setup() throws Exception {
         this.root = getDAP4Root();
         if(this.root == null)
             throw new Exception("dap4 root not found");
@@ -139,12 +131,13 @@ public class TestH5Iosp extends DapTestCommon
     //////////////////////////////////////////////////
     // Junit test methods
 
+    @Test
     public void testH5Iosp()
         throws Exception
     {
             for(H5IospTest testcase : chosentests) {
                 if(!doOneTest(testcase)) {
-                    assertTrue(false);
+                    Assert.assertTrue(false);
                 }
             }
     }

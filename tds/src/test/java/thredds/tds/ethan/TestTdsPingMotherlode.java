@@ -32,11 +32,14 @@
  */
 package thredds.tds.ethan;
 
-import junit.framework.TestCase;
-import thredds.client.catalog.Catalog;
-
 import java.io.IOException;
 import java.util.Properties;
+
+import junit.framework.TestCase;
+import org.junit.experimental.categories.Category;
+import thredds.client.catalog.Catalog;
+import ucar.unidata.test.util.NeedsExternalResource;
+import ucar.unidata.test.util.TestDir;
 
 /**
  * _more_
@@ -44,10 +47,11 @@ import java.util.Properties;
  * @author edavis
  * @since Nov 30, 2006 11:13:36 AM
  */
+@Category(NeedsExternalResource.class)
 public class TestTdsPingMotherlode extends TestCase
 {
 
-  private String host = "thredds.ucar.edu";
+  private String host = TestDir.threddsTestServer;
   private String targetTomcatUrl;
   private String targetTdsUrl;
 
@@ -56,6 +60,7 @@ public class TestTdsPingMotherlode extends TestCase
     super( name );
   }
 
+  @Override
   protected void setUp()
   {
     Properties env = System.getProperties();

@@ -58,7 +58,12 @@
   <li>Upon startup, if <strong>-tds</strong> was used, but <strong>-cred</strong> was not, you will be prompted for the password for the <strong>tdm</strong> user password. This allows you to start up the TDM without putting the password into a startup script. Note that user <strong>tdm</strong> should be given only the role of <strong>tdsTrigger</strong>, which only gives rights to trigger collection reloading (see <a href="#trigger">below</a>).</li>
   <li>The TDM will write index files into the data directories or index directories. The index files will have extensions <strong>gbx9</strong> and <strong>ncx2</strong>.</li>
   <li>For each featureCollection, a log file is created in the TDM  working directory, with name <strong>fc.&lt;collectionName&gt;.log</strong>. Monitor these logs to look for problems with the indexing.</li>
+  <li>If you start the TDS in a shell, its best to put in the background so it can run independent of the shell:
+    <pre>^Z  (this is Control-Z)
+bg</pre>
+</li>
 </ol>
+<p>&nbsp;</p>
 <h2>Sending triggers to the TDS<a name="trigger" id="trigger"></a></h2>
 <blockquote>
   <p>The TDM scans the files in the feature Collection, and when it detects that the collection has changed, rewrites the index files. If enabled, it will send a trigger message to the TDS, and the TDS will reload that  dataset. To enable this, you must configure the TDS with the <strong>tdsTrigger</strong> role, and add the user <strong>tdm</strong> with that role. Typically you do that by editing the <strong>${tomcat}/conf/tomcat-user.xml </strong>file, eg:</p>
@@ -165,9 +170,111 @@
 </ol>
 <p>&nbsp;</p>
 <hr width="100%"/>
+<h2>GCPass1<a name="GCPass1" id="GCPass1"></a></h2>
+<p>This is a utility program to examine the files in a collection before actually indexing them.</p>
+<h4>Example:</h4>
+<pre><strong>java -Xmx2g -classpath tdm-4.6.jar thredds.tdm.GCpass1 -spec &quot;Q:/cdmUnitTest/gribCollections/rdavm/ds083.2/PofP/**/.*grib1&quot; -useCacheDir &quot;C:/temp/cache/&quot; </strong><strong></strong><strong> &gt; gcpass1</strong><strong>.out</strong></pre>
+<h4>Command line arguments:</h4>
+<pre>Usage: thredds.tdm.GCpass1 [options]<br />  Options:<br />    -h, --help<br />       Display this help and exit<br />       Default: false<br />    -isGrib2<br />       Is Grib2 collection.<br />       Default: false<br />    -partition<br />       Partition type: none, directory, file<br />       Default: directory<br />    -regexp<br />       Collection regexp string, exactly as in the &lt;featureCollection&gt;.<br />    -rootDir<br />       Collection rootDir, exactly as in the &lt;featureCollection&gt;.<br />    -spec<br />       Collection specification string, exactly as in the &lt;featureCollection&gt;.<br />    -useCacheDir<br />       Set the Grib index cache directory.<br />    -useTableVersion<br />       Use Table version to make seperate variables.<br />       Default: false</pre>
+<ul>
+  <li>You must have <strong>spec</strong> or (<strong>regexp</strong> and <strong>rootDir)</strong>.</li>
+  <li>if <strong>useCacheDir</strong> is not set, indexes will be in the data directories</li>
+</ul>
+<h4>Sample Output:</h4>
+<pre>1) FeatureCollectionConfig name= 'GCpass1' collectionName= 'GCpass1' type= 'GRIB1'
+ 		spec= 'B:/rdavm/ds083.2/grib1/**/.*grib1'
+ 		timePartition= directory
+
+ 												#files  #records   #vars  #runtimes    #gds
+2) Directory B:\rdavm\ds083.2\grib1
+3)  Directory B:\rdavm\ds083.2\grib1\1999
+4) B:\rdavm\ds083.2\grib1\1999\1999.07 total       1      244       63        1        1 1999-07-30T18:00:00Z - 1999-07-30T18:00:00Z 
+   B:\rdavm\ds083.2\grib1\1999\1999.08 total     119    29046       66      119        1 1999-08-01T00:00:00Z - 1999-08-31T18:00:00Z 
+   B:\rdavm\ds083.2\grib1\1999\1999.09 total      89    21755       66       89        1 1999-09-01T00:00:00Z - 1999-09-30T12:00:00Z 
+   B:\rdavm\ds083.2\grib1\1999\1999.10 total      62    15128       63       62        1 1999-10-01T00:00:00Z - 1999-10-31T12:00:00Z 
+   B:\rdavm\ds083.2\grib1\1999\1999.11 total      97    23816       66       97        1 1999-11-01T00:00:00Z - 1999-11-30T18:00:00Z 
+   B:\rdavm\ds083.2\grib1\1999\1999.12 total     120    29512       66      120        1 1999-12-01T00:00:00Z - 1999-12-31T18:00:00Z 
+5)       B:\rdavm\ds083.2\grib1\1999   total     488   119501       66      488        1 1999-07-30T18:00:00Z - 1999-12-31T18:00:00Z 
+
+3) Directory B:\rdavm\ds083.2\grib1\2000
+4) B:\rdavm\ds083.2\grib1\2000\2000.01 total     124    30504       64      124        1 2000-01-01T00:00:00Z - 2000-01-31T18:00:00Z 
+   B:\rdavm\ds083.2\grib1\2000\2000.02 total     116    28536       64      116        1 2000-02-01T00:00:00Z - 2000-02-29T18:00:00Z 
+   B:\rdavm\ds083.2\grib1\2000\2000.03 total     124    30504       64      124        1 2000-03-01T00:00:00Z - 2000-03-31T18:00:00Z 
+   B:\rdavm\ds083.2\grib1\2000\2000.04 total     120    29520       64      120        1 2000-04-01T00:00:00Z - 2000-04-30T18:00:00Z 
+...
+  
+  B:\rdavm\ds083.2\grib1\2014\2014.11 total     120    34560       76      120         1 2014-11-01T00:00:00Z - 2014-11-30T18:00:00Z 
+  B:\rdavm\ds083.2\grib1\2014\2014.12 total      67    19296       76       67         1 2014-12-01T00:00:00Z - 2014-12-17T12:00:00Z 
+5)         B:\rdavm\ds083.2\grib1\2014 total    1403   444544      116     1403        1 2014-01-01T00:00:00Z - 2014-12-17T12:00:00Z 
+6)              B:\rdavm\ds083.2\grib1 total   22347  6546693      118    22347        1 1999-07-30T18:00:00Z - 2014-12-17T12:00:00Z 
+
+                                          #files  #records   #vars  #runtimes    #gds
+6)                            grand total   22347  6546693      118    22347        1 
+
+7)
+referenceDate (22347)
+   1999-07-30T18:00:00Z - 2014-12-17T12:00:00Z: count = 22347
+
+8)
+table version (2)
+         7-0-1: count = 3188
+         7-0-2: count = 6543505
+
+9)
+variable (118)
+    5-wave_geopotential_height_anomaly_isobaric_10: count = 22076
+    5-wave_geopotential_height_isobaric_10: count = 22344
+    Absolute_vorticity_isobaric_10: count = 581022
+    Albedo_surface_Average: count = 6922
+	  ...
+
+10)
+gds (1)
+    1645598069: count = 6546693
+
+11)
+gdsTemplate (1)
+             0: count = 6546693
+
+12)
+vertCoordInGDS (0)
+
+13)
+predefined (0)
+
+14)
+thin (0)
+</pre>
+<p>where:</p>
+<ol>
+  <li>The Feature Collection configuration</li>
+  <li>The top level directory</li>
+  <li>Subdirectory</li>
+  <li>Partitions - in this case these are directories because this is a &quot;directory partition&quot;.
+    <ol>
+      <li>number of files in the partition</li>
+      <li>number of records in the partition</li>
+      <li>number of seperate variables in the partition.<em> Inhomogenous partitions look more complex to the user.</em></li>
+      <li>number of runtimes in the partition</li>
+      <li>number of horizontal (GDS), which are turned into groups</li>
+      <li>the starting and ending runtime. <em>Look for overlapping partitions</em></li>
+    </ol>
+  </li>
+  <li>Sum of 4) subpartitions for this partition</li>
+  <li>Grand sum over all partitions</li>
+  <li>Summary (n, start/end) of run dates</li>
+  <li>list of all table versions found, count of number of records for each. <em>Possibility that variables that should be seperated by table version.</em></li>
+  <li>list of all variables found, count of number of records for each. <em>Possibility that stray records are in the collection.</em></li>
+  <li>list of all GDS hashes found, count of number of records for each. <em>Possibility of spurious differences with GDS hashes</em>.</li>
+  <li>list of all GDS templates found, count of number of records for each</li>
+  <li>count of records that have vertical coordinates in the GDS (GRIB1 only)</li>
+  <li>count of records that have predefined GDS (GRIB1 only) <em>Possibility of unknown predefined GDS.</em></li>
+  <li>count of records that have &quot;Quasi/Thin&quot; Grid (GRIB1 only)</li>
+</ol>
+<hr width="100%"/>
 <address>
   <img src="../../thread.png" alt="" width="76" height="67"/> This document is maintained by <a href="mailto:caron@unidata.ucar.edu">John Caron</a>
-  and was last updated October 2014
+  and was last updated May 2015
 </address>
 </body>
 </html>

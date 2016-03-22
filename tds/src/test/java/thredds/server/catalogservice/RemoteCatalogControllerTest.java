@@ -1,26 +1,27 @@
 package thredds.server.catalogservice;
 
+import org.junit.Before;
+import org.junit.Test;
+import org.junit.experimental.categories.Category;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.web.WebAppConfiguration;
+import org.springframework.web.servlet.ModelAndView;
+import thredds.mock.web.MockTdsContextLoader;
+import ucar.unidata.test.util.NeedsContentRoot;
+import ucar.unidata.test.util.NeedsExternalResource;
+import ucar.unidata.test.util.TestDir;
+
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.springframework.test.web.ModelAndViewAssert.assertModelAttributeAvailable;
 import static org.springframework.test.web.ModelAndViewAssert.assertViewName;
 
-import org.junit.Before;
-import org.junit.Ignore;
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
-import org.springframework.test.context.web.WebAppConfiguration;
-import org.springframework.web.servlet.ModelAndView;
-
-import thredds.mock.web.MockTdsContextLoader;
-
 @WebAppConfiguration
 @ContextConfiguration(locations = { "/WEB-INF/applicationContext-tdsConfig.xml" }, loader = MockTdsContextLoader.class)
+@Category(NeedsContentRoot.class)
 public class RemoteCatalogControllerTest extends AbstractCatalogServiceTest{
 
 	//RemoteCatalogRequest parameters:
@@ -56,10 +57,10 @@ public class RemoteCatalogControllerTest extends AbstractCatalogServiceTest{
 	}
 
 	@Test
+	@Category(NeedsExternalResource.class)
 	public void showCommandTest() throws Exception{
-
 		// Testing against some reliable remote TDS
-		catUriString = "http://thredds.ucar.edu/thredds/catalog.xml";
+		catUriString = "http://"+ TestDir.threddsTestServer+"/thredds/catalog.xml";
 		request.setRequestURI(catUriString);
 
 		// REQUEST WITH DEFAULT VALUES
@@ -86,8 +87,8 @@ public class RemoteCatalogControllerTest extends AbstractCatalogServiceTest{
 
 	// http://thredds.ucar.edu/thredds/catalog/grib/NCEP/NAM/CONUS_80km/catalog.html?dataset=grib/NCEP/NAM/CONUS_80km/best
 	@Test
+	@Category(NeedsExternalResource.class)
 	public void subsetCommandTest() throws Exception{
-
 		// SUBSET REQUEST PROVIDING A datasetId
 		// setting up the request with default values:
 		// command =null
@@ -95,7 +96,7 @@ public class RemoteCatalogControllerTest extends AbstractCatalogServiceTest{
 		// htmlView= null
 		// verbose = null
 		// command null and a providing a datasetId becomes in a subset command  
-		catUriString = "http://thredds.ucar.edu/thredds/catalog/grib/NCEP/NAM/CONUS_80km/catalog.xml";
+		catUriString = "http://"+TestDir.threddsTestServer+"/thredds/catalog/grib/NCEP/NAM/CONUS_80km/catalog.xml";
 		request.setParameter(parameterNameCatalog, catUriString);
 		request.setParameter(parameterNameCommand, command);
 		request.setParameter(parameterNameDatasetId, "grib/NCEP/NAM/CONUS_80km/Best");
@@ -110,17 +111,16 @@ public class RemoteCatalogControllerTest extends AbstractCatalogServiceTest{
 		// and we should have a nice response		
 		assertTrue( response.getStatus() == 200 );
 	}
-	
-	//@Ignore
-	@Test
-	public void validateCommandTest() throws Exception {
 
+	@Test
+	@Category(NeedsExternalResource.class)
+	public void validateCommandTest() throws Exception {
 		// VALIDATE REQUEST 
 		// command =validate
 		// datasetId= null
 		// htmlView= null
 		// verbose = null 
-    catUriString = "http://thredds.ucar.edu/thredds/catalog/grib/NCEP/NAM/CONUS_80km/catalog.xml";
+    catUriString = "http://"+TestDir.threddsTestServer+"/thredds/catalog/grib/NCEP/NAM/CONUS_80km/catalog.xml";
 		request.setParameter(parameterNameCatalog, catUriString);
 		request.setParameter(parameterNameCommand, cmdValidate);
 		request.setParameter(parameterNameDatasetId, datasetId);

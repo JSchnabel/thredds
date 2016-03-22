@@ -150,7 +150,6 @@ public class CdmInit implements InitializingBean,  DisposableBean{
     String dir;
     int scourSecs, maxAgeSecs;
 
-
     // Nj22 disk cache
     dir = ThreddsConfig.get("DiskCache.dir", new File( tdsContext.getContentDirectory(), "/cache/cdm/" ).getPath());
     boolean alwaysUse = ThreddsConfig.getBoolean("DiskCache.alwaysUse", false);
@@ -170,7 +169,9 @@ public class CdmInit implements InitializingBean,  DisposableBean{
     dir = ThreddsConfig.get("AggregationCache.dir", new File( tdsContext.getContentDirectory().getPath(), "/cache/agg/").getPath());
     scourSecs = ThreddsConfig.getSeconds("AggregationCache.scour", 24 * 60 * 60);
     maxAgeSecs = ThreddsConfig.getSeconds("AggregationCache.maxAge", 90 * 24 * 60 * 60);
+    String cachePathPolicy = ThreddsConfig.get("AggregationCache.cachePathPolicy", null);
     aggCache = new DiskCache2(dir, false, maxAgeSecs / 60, scourSecs / 60);
+    aggCache.setPolicy(cachePathPolicy);
     Aggregation.setPersistenceCache(aggCache);
     startupLog.info("CdmInit:  AggregationCache= "+dir+" scour = "+scourSecs+" maxAgeSecs = "+maxAgeSecs);
 
@@ -198,7 +199,8 @@ public class CdmInit implements InitializingBean,  DisposableBean{
     startupLog.info("CdmInit:  CdmRemote= "+dir+" scour = "+scourSecs+" maxAgeSecs = "+maxAgeSecs);
 
 
-    // LOOK 4.5 not used ?? FMRC ????
+    // turn back on for 4.6 needed for FMRC
+    // turned off for 4.5 not used ??
     // new for 4.2 - feature collection caching
     // in 4.4, change name to FeatureCollectionCache, but keep old for backwards compatibility
     String fcCache = ThreddsConfig.get("FeatureCollectionCache.dir", null);
@@ -217,7 +219,7 @@ public class CdmInit implements InitializingBean,  DisposableBean{
 
     try {
       thredds.inventory.bdb.MetadataManager.setCacheDirectory(fcCache, maxSizeBytes, jvmPercent);
-      //LOOK thredds.inventory.CollectionManagerAbstract.setMetadataStore(thredds.inventory.bdb.MetadataManager.getFactory());
+      thredds.inventory.CollectionManagerAbstract.setMetadataStore(thredds.inventory.bdb.MetadataManager.getFactory());  // LOOK
       startupLog.info("CdmInit: CollectionManagerAbstract.setMetadataStore= "+fcCache);
     } catch (Exception e) {
       startupLog.error("CdmInit: Failed to open CollectionManagerAbstract.setMetadataStore= "+fcCache, e);

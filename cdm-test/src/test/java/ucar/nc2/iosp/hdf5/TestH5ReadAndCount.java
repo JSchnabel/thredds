@@ -33,21 +33,27 @@
 
 package ucar.nc2.iosp.hdf5;
 
+import org.junit.Test;
+import org.junit.experimental.categories.Category;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
+import ucar.nc2.Group;
+import ucar.nc2.NetcdfFile;
+import ucar.nc2.Structure;
+import ucar.nc2.Variable;
+import ucar.unidata.test.util.NeedsCdmUnitTest;
+import ucar.unidata.util.StringUtil2;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
-import ucar.nc2.*;
-import ucar.unidata.util.StringUtil2;
-
 @RunWith(Parameterized.class)
+@Category(NeedsCdmUnitTest.class)
 public class TestH5ReadAndCount {
   static public String testDir = TestH5.testDir;
 
-  @Parameterized.Parameters
+  @Parameterized.Parameters(name="{0}")
   public static List<Object[]> getTestParameters() {
     List<Object[]> result = new ArrayList<>();
 

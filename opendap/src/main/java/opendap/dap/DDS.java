@@ -392,14 +392,14 @@ public class DDS extends DStructure
      public boolean parse(String text)
 	throws ParseException, DAP2Exception
     {
-        DapParser parser = new DapParser(factory);
+        Dap2Parser parser = new Dap2Parser(factory);
         parser.setURL(url);
 
 	int result = parser.ddsparse(text,this);
 
-	if(result == Dapparse.DapERR)
+	if(result == Dap2Parse.DapERR)
 	    throw parser.getERR();
-	return (result == Dapparse.DapDDS ? true : false);
+	return (result == Dap2Parse.DapDDS ? true : false);
     }
 
 
@@ -1923,7 +1923,7 @@ public class DDS extends DStructure
 
         pw.print("<Dataset");
         if(getEncodedName() != null)
-            pw.print("name=\"" + DDSXMLParser.normalizeToXML(getEncodedName()) + "\"");
+            pw.print(" name=\"" + DDSXMLParser.normalizeToXML(getEncodedName()) + "\"");
         pw.println();
         pw.println("xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"");
         pw.println("xmlns=\"" + opendapNameSpace + "\"");

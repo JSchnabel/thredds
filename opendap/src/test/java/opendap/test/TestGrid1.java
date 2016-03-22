@@ -32,8 +32,11 @@
  */
 package opendap.test;
 
+import org.junit.Assert;
+import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import ucar.nc2.dataset.NetcdfDataset;
-import ucar.nc2.util.UnitTestCommon;
+import ucar.unidata.test.util.NeedsExternalResource;
 import ucar.unidata.test.util.TestDir;
 
 /**
@@ -53,7 +56,7 @@ import ucar.unidata.test.util.TestDir;
  * } testgrid1
  */
 
-public class TestGrid1 extends UnitTestCommon
+public class TestGrid1 extends TestSources
 {
     static final protected String DATASET = "testgrid1.nc";
 
@@ -70,6 +73,8 @@ public class TestGrid1 extends UnitTestCommon
         setSystemProperties();
     }
 
+    @Test
+    @Category(NeedsExternalResource.class)
     public void testGrid1()
             throws Exception
     {
@@ -78,9 +83,9 @@ public class TestGrid1 extends UnitTestCommon
         boolean pass = true;
         NetcdfDataset ncfile = null;
         if(TestDir.threddsTestServer.startsWith("localhost"))
-            url = "dods://" + TestDir.threddsTestServer + URLPATH_LOCAL;
+            url = "dods://" + TestDir.remoteTestServer + URLPATH_LOCAL;
         else
-            url = "dods://" + TestDir.threddsTestServer + URLPATH_REMOTE;
+            url = "dods://" + TestDir.remoteTestServer + URLPATH_REMOTE;
 
         try {
             ncfile = NetcdfDataset.openDataset(url);
@@ -89,7 +94,7 @@ public class TestGrid1 extends UnitTestCommon
             pass = false;
         }
 
-        assertTrue("TestGrid1: cannot find dataset", pass);
+        Assert.assertTrue("TestGrid1: cannot find dataset", pass);
 
         System.out.println("url: " + url);
 
@@ -113,7 +118,7 @@ public class TestGrid1 extends UnitTestCommon
                     pass = false;
             }
         }
-        assertTrue("Testing TestGrid1" + getTitle(), pass
+        Assert.assertTrue("Testing TestGrid1" + getTitle(), pass
 
         );
     }

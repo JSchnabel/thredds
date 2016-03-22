@@ -32,32 +32,49 @@
  */
 package thredds.tds.ethan;
 
-import junit.framework.*;
-
-import java.io.*;
-import java.util.*;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.PrintStream;
+import java.io.PrintWriter;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.Formatter;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-import thredds.client.catalog.*;
+import junit.framework.Test;
+import junit.framework.TestCase;
+import junit.framework.TestSuite;
+import org.junit.experimental.categories.Category;
+import thredds.client.catalog.Access;
+import thredds.client.catalog.Catalog;
+import thredds.client.catalog.CatalogRef;
+import thredds.client.catalog.Dataset;
+import thredds.client.catalog.ServiceType;
 import thredds.client.catalog.builder.CatalogBuilder;
 import thredds.client.catalog.writer.CatalogCrawler;
 import thredds.client.catalog.writer.DataFactory;
+import ucar.nc2.Attribute;
+import ucar.nc2.VariableSimpleIF;
 import ucar.nc2.constants.CDM;
-import ucar.nc2.time.CalendarDate;
-import ucar.nc2.time.CalendarDateFormatter;
-import ucar.nc2.dataset.NetcdfDataset;
 import ucar.nc2.dataset.CoordinateAxis1D;
+import ucar.nc2.dataset.NetcdfDataset;
 import ucar.nc2.dataset.VerticalCT;
+import ucar.nc2.dt.GridCoordSystem;
+import ucar.nc2.dt.GridDataset;
 import ucar.nc2.dt.TypedDataset;
 import ucar.nc2.dt.TypedDatasetFactory;
-import ucar.nc2.dt.GridDataset;
-import ucar.nc2.dt.GridCoordSystem;
-import ucar.nc2.VariableSimpleIF;
-import ucar.nc2.Attribute;
-import ucar.unidata.geoloc.vertical.VerticalTransform;
+import ucar.nc2.time.CalendarDate;
+import ucar.nc2.time.CalendarDateFormatter;
 import ucar.unidata.geoloc.ProjectionImpl;
 import ucar.unidata.geoloc.ogc.EPSG_OGC_CF_Helper;
+import ucar.unidata.geoloc.vertical.VerticalTransform;
+import ucar.unidata.test.util.NeedsExternalResource;
+import ucar.unidata.test.util.TestDir;
 
 /**
  * _more_
@@ -65,6 +82,7 @@ import ucar.unidata.geoloc.ogc.EPSG_OGC_CF_Helper;
  * @author edavis
  * @since Feb 15, 2007 10:10:08 PM
  */
+@Category(NeedsExternalResource.class)
 public class TestAll extends TestCase
 {
   public static Test suite()
@@ -126,7 +144,7 @@ public class TestAll extends TestCase
   private boolean showDebug;
   private boolean verbose;
 
-  private String host = "thredds.ucar.edu";
+  private String host = TestDir.threddsTestServer;
   private String[] catalogList;
 
   private String targetTdsUrl;
@@ -136,12 +154,13 @@ public class TestAll extends TestCase
     super( name );
   }
 
+  @Override
   protected void setUp()
   {
     if ( null == System.getProperty( "thredds.tds.test.id"))
       System.setProperty( "thredds.tds.test.id", "crawl-newmlode-8080" );
     if ( null == System.getProperty( "thredds.tds.test.server" ) )
-      System.setProperty( "thredds.tds.test.server", "thredds.ucar.edu" );
+      System.setProperty( "thredds.tds.test.server", TestDir.threddsTestServer );
     if ( null == System.getProperty( "thredds.tds.test.level" ) )
       System.setProperty( "thredds.tds.test.level", "crawl-catalogs" );
     if ( null == System.getProperty( "thredds.tds.test.catalogs" ) )
@@ -401,7 +420,7 @@ public class TestAll extends TestCase
       public boolean getCatalogRef(CatalogRef dd, Object context) { return true; }
 
     };
-    CatalogCrawler crawler = new CatalogCrawler( CatalogCrawler.Type.all_direct, null, listener );
+    CatalogCrawler crawler = new CatalogCrawler( CatalogCrawler.Type.all_direct, 0, null, listener );
 
     ByteArrayOutputStream os = new ByteArrayOutputStream();
     PrintWriter out = new PrintWriter( new OutputStreamWriter(os, CDM.utf8Charset));
@@ -553,7 +572,7 @@ public class TestAll extends TestCase
       public boolean getCatalogRef(CatalogRef dd, Object context) { return true; }
 
     };
-    CatalogCrawler crawler = new CatalogCrawler( CatalogCrawler.Type.random_direct, null, listener );
+    CatalogCrawler crawler = new CatalogCrawler( CatalogCrawler.Type.random_direct, 0, null, listener );
 
     ByteArrayOutputStream os = new ByteArrayOutputStream();
     PrintWriter out = new PrintWriter( new OutputStreamWriter(os, CDM.utf8Charset));
@@ -757,12 +776,12 @@ public class TestAll extends TestCase
       public boolean getCatalogRef(CatalogRef dd, Object context) { return true; }
       
     };
-    CatalogCrawler crawler = new CatalogCrawler( CatalogCrawler.Type.random_direct, null, listener );
+    CatalogCrawler crawler = new CatalogCrawler( CatalogCrawler.Type.random_direct, 0, null, listener );
 
     for ( String curCat : catList )
     {
       gcsMsg.append( "********************\n<h4>" ).append( curCat ).append( "</h4>\n\n<pre>\n" );
-      curCat = "http://thredds.ucar.edu/thredds/catalog/" + curCat + "/files/catalog.xml";
+      curCat = "http://"+TestDir.threddsTestServer+"/thredds/catalog/" + curCat + "/files/catalog.xml";
       ByteArrayOutputStream os = new ByteArrayOutputStream();
       PrintWriter out = new PrintWriter( new OutputStreamWriter(os, CDM.utf8Charset));
       int numDs = 0;

@@ -78,11 +78,11 @@ public class AggTable extends JPanel {
     this.prefs = prefs;
 
     datasetTable = new BeanTable(DatasetBean.class, (PreferencesExt) prefs.node("DatasetBean"), false);
-    datasetTable.addListSelectionListener(new ListSelectionListener() {
+    /* datasetTable.addListSelectionListener(new ListSelectionListener() {
       public void valueChanged(ListSelectionEvent e) {
         datasetTable.getSelectedBean();
       }
-    });
+    }); */
 
     PopupMenu varPopup = new ucar.nc2.ui.widget.PopupMenu(datasetTable.getJTable(), "Options");
     varPopup.addAction("Open as NetcdfFile", new AbstractAction() {
@@ -141,6 +141,11 @@ public class AggTable extends JPanel {
     datasetTable.saveState(false);
     prefs.putBeanObject("InfoWindowBounds", infoWindow.getBounds());
     prefs.putInt("splitPos", split.getDividerLocation());
+  }
+
+  public void clear() {
+    datasetTable.clearBeans();
+    aggTA.clear();
   }
 
   public void setAggDataset(NetcdfDataset ncd) throws IOException {

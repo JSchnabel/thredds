@@ -44,7 +44,6 @@ import ucar.nc2.dataset.CoordinateSystem;
 import ucar.nc2.dataset.CoordinateAxis;
 import ucar.nc2.ft.point.standard.PointDatasetStandardFactory;
 import ucar.nc2.ft.point.collection.CompositeDatasetFactory;
-import ucar.nc2.ft.grid.GridDatasetStandardFactory;
 import ucar.nc2.ft.radial.RadialDatasetStandardFactory;
 import ucar.nc2.ft.swath.SwathDatasetFactory;
 import ucar.nc2.stream.CdmrFeatureDataset;
@@ -241,7 +240,7 @@ public class FeatureDatasetFactoryManager {
       // special processing for collection: datasets
     } else if (location.startsWith(ucar.nc2.ft.point.collection.CompositeDatasetFactory.SCHEME)) {
       String spec = location.substring(CompositeDatasetFactory.SCHEME.length());
-      CollectionManager dcm = MFileCollectionManager.open(spec, spec, null, errlog); // look we dont have a name
+      MFileCollectionManager dcm = MFileCollectionManager.open(spec, spec, null, errlog); // look we dont have a name
       return CompositeDatasetFactory.factory(location, wantFeatureType, dcm, errlog);
     }
 

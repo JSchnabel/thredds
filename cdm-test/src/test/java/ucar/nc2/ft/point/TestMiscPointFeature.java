@@ -32,14 +32,9 @@
 
 package ucar.nc2.ft.point;
 
-import java.io.IOException;
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
-import java.util.*;
-
 import org.junit.Assert;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import ucar.ma2.DataType;
 import ucar.ma2.StructureData;
 import ucar.ma2.StructureMembers;
@@ -52,17 +47,35 @@ import ucar.nc2.units.DateRange;
 import ucar.unidata.geoloc.LatLonPointImpl;
 import ucar.unidata.geoloc.LatLonRect;
 import ucar.unidata.geoloc.Station;
+import ucar.unidata.test.util.NeedsCdmUnitTest;
 import ucar.unidata.test.util.TestDir;
+
+import java.io.IOException;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 public class TestMiscPointFeature {
 
-
   @Test
   public void testProblem() throws IOException {
-    String location = TestPointDatasets.topdir + "ft/trajectory/cosmic/wetPrf_C005.2007.294.16.22.G17_0001.0002_nc";
-    assert 383 == TestPointDatasets.checkPointDataset(location, FeatureType.TRAJECTORY, true);
+    String location =  TestDir.cdmLocalTestDataDir + "point/trajMultidimJoinTime.ncml";
+    assert 20 == TestPointDatasets.checkPointDataset(location, FeatureType.TRAJECTORY, true);
   }
 
+  @Test
+  public void testProblem2() throws IOException {
+    String location =  TestDir.cdmLocalTestDataDir + "point/stationMultidimTimeJoin.ncml";
+    assert 15 == TestPointDatasets.checkPointDataset(location, FeatureType.STATION, true);
+  }
+
+  @Test
+  @Category(NeedsCdmUnitTest.class)
+  public void testProblem3() throws IOException {
+    String location =  TestDir.cdmUnitTestDir + "ft/stationProfile/PROFILER_RASS_01hr_20091027_1500.nc";
+    assert 198 == TestPointDatasets.checkPointDataset(location, FeatureType.STATION_PROFILE, true);
+  }
 
   @Test
   public void testStationVarLevels() throws Exception {
@@ -320,6 +333,7 @@ public class TestMiscPointFeature {
   }
 
   @Test
+  @Category(NeedsCdmUnitTest.class)
   public void testGempak() throws Exception {
     String file = TestDir.cdmUnitTestDir + "formats/gempak/surface/09052812.sf";       // Q:/cdmUnitTest/formats/gempak/surface/09052812.sf
     Formatter buf = new Formatter();

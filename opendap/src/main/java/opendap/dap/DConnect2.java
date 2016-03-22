@@ -40,38 +40,37 @@
 
 package opendap.dap;
 
-import java.net.*;
-import java.io.*;
-
-import opendap.dap.parsers.*;
-
-import java.nio.charset.Charset;
-import java.util.List;
-import java.util.zip.InflaterInputStream;
-import java.util.zip.GZIPInputStream;
-
 import opendap.dap.parsers.ParseException;
-import org.apache.http.cookie.Cookie;
-import ucar.nc2.util.EscapeStrings;
-import org.apache.http.*;
-import org.apache.http.auth.*;
-import ucar.httpservices.*;
+import org.apache.http.Header;
+import org.apache.http.HttpStatus;
+import org.apache.http.auth.InvalidCredentialsException;
+import ucar.httpservices.HTTPException;
+import ucar.httpservices.HTTPFactory;
+import ucar.httpservices.HTTPMethod;
+import ucar.httpservices.HTTPSession;
+
+import java.io.*;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.nio.charset.Charset;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.InflaterInputStream;
 
 /**
  * Rewritten 1/15/07 jcaron to use HttpCLient library instead of jdk UrlConnection class.
  * Need more robust redirect and authentication.
- * <p/>
+ * <p>
  * This class provides support for common DODS client-side operations such as
  * dereferencing a OPeNDAP URL, communicating network activity status
  * to the user and reading local OPeNDAP objects.
- * <p/>
+ * <p>
  * Unlike its C++ counterpart, this class does not store instances of the DAS,
  * DDS, etc. objects. Rather, the methods <code>getDAS</code>, etc. return
  * instances of those objects.
  *
  * @author jehamby
  */
-public class DConnect2
+public class DConnect2 implements Closeable
 {
 
     static private boolean allowSessions = false;
@@ -108,6 +107,7 @@ public class DConnect2
     private String lastExtended = null;
     private String lastModifiedInvalid = null;
     private boolean hasSession = true;
+    protected HTTPSession _session = null;
 
     private ServerVersion ver; // The OPeNDAP server version.
 
@@ -130,7 +130,7 @@ public class DConnect2
      * @throws FileNotFoundException thrown if <code>urlString</code> is not
      *                               a valid URL, or a filename which exists on the system.
      */
-    public DConnect2(String urlString) throws FileNotFoundException
+    public DConnect2(String urlString) throws HTTPException
     {
         this(urlString, true);
     }
@@ -145,7 +145,8 @@ public class DConnect2
      * @throws FileNotFoundException thrown if <code>urlString</code> is not
      *                               a valid URL, or a filename which exists on the system.
      */
-    public DConnect2(String urlString, boolean acceptCompress) throws FileNotFoundException
+    public DConnect2(String urlString, boolean acceptCompress)
+            throws HTTPException
     {
         int ceIndex = urlString.indexOf('?');
         if(ceIndex != -1) {
@@ -172,19 +173,21 @@ public class DConnect2
                 // See if .dds and .dods files exist
                 File f = new File(filePath + ".dds");
                 if(!f.canRead()) {
-                    throw new FileNotFoundException("file not readable: " + urlString + ".dds");
+                    throw new HTTPException("file not readable: " + urlString + ".dds");
                 }
                 f = new File(filePath + ".dods");
                 if(!f.canRead()) {
-                    throw new FileNotFoundException("file not readable: " + urlString + ".dods");
+                    throw new HTTPException("file not readable: " + urlString + ".dods");
                 }
+            } else {
+                _session = HTTPFactory.newSession(this.urlString);
             }
     /* Set the server version cause we won't get it from anywhere */
             ver = new ServerVersion(ServerVersion.DAP2_PROTOCOL_VERSION, ServerVersion.XDAP);
         } catch (DAP2Exception ex) {
-            throw new FileNotFoundException("Cannot set server version");
+            throw new HTTPException("Cannot set server version");
         } catch (MalformedURLException e) {
-            throw new FileNotFoundException("Malformed URL: " + urlString);
+            throw new HTTPException("Malformed URL: " + urlString);
         }
     }
 
@@ -214,7 +217,7 @@ public class DConnect2
     /**
      * Returns the constraint expression supplied with the URL given to the
      * constructor. If no CE was given this returns an empty <code>String</code>.
-     * <p/>
+     * <p>
      * Note that the CE supplied to one of this object's constructors is
      * "sticky"; it will be used with every data request made with this object.
      * The CE passed to <code>getData</code>, however, is not sticky; it is used
@@ -239,6 +242,16 @@ public class DConnect2
     }
 
     /**
+     * Return the session associated with this connection
+     *
+     * @return this connections session (or null)
+     */
+    public HTTPSession getSession()
+    {
+        return _session;
+    }
+
+    /**
      * Open a connection to the DODS server.
      *
      * @param urlString the URL to open; assume already properly encoded
@@ -248,84 +261,81 @@ public class DConnect2
      */
     private void openConnection(String urlString, Command command) throws IOException, DAP2Exception
     {
-        HTTPMethod method = null;
         InputStream is = null;
 
-        HTTPSession _session = null;
-
         try {
-            _session = HTTPFactory.newSession(urlString);
-            method = HTTPFactory.Get(_session);
+            try (HTTPMethod method = HTTPFactory.Get(_session, urlString)) {
 
-            if(acceptCompress)
-                method.setRequestHeader("Accept-Encoding", "deflate,gzip");
+                if(acceptCompress)
+                    method.setCompression("deflate,gzip");
 
-            // enable sessions
-            if(allowSessions)
-                method.setRequestHeader("X-Accept-Session", "true");
+                // enable sessions
+                if(allowSessions)
+                    method.setUseSessions(true);
+                int statusCode;
+                for(;;) {
+                    statusCode = method.execute();
+                    if(statusCode != HttpStatus.SC_SERVICE_UNAVAILABLE)
+                        break;
+                    Thread.sleep(5000);
+                    System.err.println("Service Unavailable");
+                }
 
-            int statusCode = method.execute();
+                // debug
+                // if (debugHeaders) ucar.httpservices.HttpClientManager.showHttpRequestInfo(f, method);
 
-            // debug
-            // if (debugHeaders) ucar.httpservices.HttpClientManager.showHttpRequestInfo(f, method);
+                if(statusCode == HttpStatus.SC_NOT_FOUND) {
+                    throw new DAP2Exception(DAP2Exception.NO_SUCH_FILE, method.getStatusText() + ": " + urlString);
+                }
 
-            if(statusCode == HttpStatus.SC_NOT_FOUND) {
-                throw new DAP2Exception(DAP2Exception.NO_SUCH_FILE, method.getStatusText() + ": " + urlString);
+                if(statusCode == HttpStatus.SC_UNAUTHORIZED) {
+                    throw new InvalidCredentialsException(method.getStatusText());
+                }
+
+                if(statusCode != HttpStatus.SC_OK) {
+                    throw new DAP2Exception("Method failed:" + method.getStatusText() + " on URL= " + urlString);
+                }
+
+                // Get the response body.
+                is = method.getResponseAsStream();
+
+                // check if its an error
+                Header header = method.getResponseHeader("Content-Description");
+                if(header != null && (header.getValue().equals("dods-error")
+                        || header.getValue().equals("dods_error"))) {
+                    // create server exception object
+                    DAP2Exception ds = new DAP2Exception();
+                    // parse the Error object from stream and throw it
+                    ds.parse(is);
+                    throw ds;
+                }
+
+                ver = new ServerVersion(method);
+
+                checkHeaders(method);
+
+                // check for deflator
+                Header h = method.getResponseHeader("content-encoding");
+                String encoding = (h == null) ? null : h.getValue();
+                //if (encoding != null) LogStream.out.println("encoding= " + encoding);
+
+                if(encoding != null && encoding.equals("deflate")) {
+                    is = new BufferedInputStream(new InflaterInputStream(is), 1000);
+
+                } else if(encoding != null && encoding.equals("gzip")) {
+                    is = new BufferedInputStream(new GZIPInputStream(is), 1000);
+                }
+
+                command.process(is);
             }
-
-            if(statusCode == HttpStatus.SC_UNAUTHORIZED) {
-                throw new InvalidCredentialsException(method.getStatusText());
-            }
-
-            if(statusCode != HttpStatus.SC_OK) {
-                throw new DAP2Exception("Method failed:" + method.getStatusText() + " on URL= " + urlString);
-            }
-
-            // Get the response body.
-            is = method.getResponseAsStream();
-
-            // check if its an error
-            Header header = method.getResponseHeader("Content-Description");
-            if(header != null && (header.getValue().equals("dods-error")
-                || header.getValue().equals("dods_error"))) {
-                // create server exception object
-                DAP2Exception ds = new DAP2Exception();
-                // parse the Error object from stream and throw it
-                ds.parse(is);
-                throw ds;
-            }
-
-            ver = new ServerVersion(method);
-
-            checkHeaders(method);
-
-            // check for deflator
-            Header h = method.getResponseHeader("content-encoding");
-            String encoding = (h == null) ? null : h.getValue();
-            //if (encoding != null) LogStream.out.println("encoding= " + encoding);
-
-            if(encoding != null && encoding.equals("deflate")) {
-                is = new BufferedInputStream(new InflaterInputStream(is), 1000);
-
-            } else if(encoding != null && encoding.equals("gzip")) {
-                is = new BufferedInputStream(new GZIPInputStream(is), 1000);
-            }
-
-            command.process(is);
-
         } catch (Exception e) {
             Util.check(e);
             e.printStackTrace();
             throw new DAP2Exception(e);
-
-        } finally {
-            // Release the connection.
-            if(_session != null) _session.close();
         }
     }
 
-
-    public void closeSession()
+    public void close()
     {
         try {
             if(allowSessions && hasSession) {
@@ -337,13 +347,15 @@ public class DConnect2
                     }
                 });
             }
+            if(_session != null)
+                _session.close();
         } catch (Throwable t) {
             // ignore
         }
     }
 
     static public String captureStream(InputStream is)
-        throws IOException
+            throws IOException
     {
         ByteArrayOutputStream text = new ByteArrayOutputStream();
         int b;
@@ -359,7 +371,7 @@ public class DConnect2
     static final byte[] tag2 = "\nData:\r\n".getBytes(UTF8);
 
     static public String captureDataDDS(InputStream is)
-        throws IOException
+            throws IOException
     {
         byte[] text = new byte[4096];
         int pos = 0;
@@ -395,7 +407,7 @@ public class DConnect2
 
         if(pos < taglen) return false;
 
-        for(j = 0, i = pos - taglen;i < pos;i++, j++) {
+        for(j = 0, i = pos - taglen; i < pos; i++, j++) {
             if(text[i] != tag[j]) return false;
         }
         return true;
@@ -405,7 +417,9 @@ public class DConnect2
     {
         if(len - pos >= n) return text;
         int newlen = len * 2 + n;
-        while(newlen < n) newlen++;
+        while(newlen < n) {
+            newlen++;
+        }
         byte[] newtext = new byte[newlen];
         System.arraycopy(text, 0, newtext, 0, len);
         return newtext;
@@ -453,7 +467,7 @@ public class DConnect2
         }
 
         Header[] responseHeaders = method.getResponseHeaders();
-        for(int i1 = 0;i1 < responseHeaders.length;i1++) {
+        for(int i1 = 0; i1 < responseHeaders.length; i1++) {
             Header responseHeader = responseHeaders[i1];
             if(debugHeaders) DAPNode.log.debug("  " + responseHeader);
             String key = responseHeader.getName();
@@ -479,16 +493,6 @@ public class DConnect2
         if(debugHeaders)
             DAPNode.log.debug("OpenConnection Headers for " + method.getPath());
 
-        List<Cookie> cookies = HTTPSession.getGlobalCookies();
-
-        if(cookies.size() > 0) {
-            if(debugHeaders) DAPNode.log.debug("Cookies= ");
-            for(Cookie cooky : cookies) {
-                if(debugHeaders) DAPNode.log.debug("  " + cooky);
-                if(cooky.getName().equalsIgnoreCase("jsessionid"))
-                    hasSession = true;
-            }
-        }
     }
 
     private interface Command
@@ -514,10 +518,10 @@ public class DConnect2
         if(filePath != null) { // url was file:
             File daspath = new File(filePath + ".das");
             // See if the das file exists
-            if (daspath.canRead()) {
-              try (FileInputStream is = new FileInputStream(daspath) ) {
-                command.process(is);
-              }
+            if(daspath.canRead()) {
+                try (FileInputStream is = new FileInputStream(daspath)) {
+                    command.process(is);
+                }
             }
         } else if(stream != null) {
             command.process(stream);
@@ -579,10 +583,10 @@ public class DConnect2
     {
         DDSCommand command = new DDSCommand();
         command.setURL(CE == null || CE.length() == 0 ? urlString : urlString + "?" + CE);
-        if (filePath != null) {
-          try (FileInputStream is = new FileInputStream(filePath + ".dds") ) {
-            command.process(is);
-          }
+        if(filePath != null) {
+            try (FileInputStream is = new FileInputStream(filePath + ".dds")) {
+                command.process(is);
+            }
         } else if(stream != null) {
             command.process(stream);
         } else { // must be a remote url
@@ -616,7 +620,7 @@ public class DConnect2
      *
      * @param CE The new CE from the client.
      * @return The complete CE (the one this object was built
-     *         with integrated with the clients)
+     * with integrated with the clients)
      */
     private String getCompleteCE(String CE)
     {
@@ -632,7 +636,7 @@ public class DConnect2
             localSelString = CE;
         } else if(selIndex > 0) {
             localSelString = CE.substring(selIndex);
-            localProjString = CE.substring(0,selIndex);
+            localProjString = CE.substring(0, selIndex);
         } else {// selIndex < 0
             localProjString = CE;
             localSelString = "";
@@ -744,7 +748,7 @@ public class DConnect2
      * @opendap.ddx.experimental
      */
     public DataDDS getDataDDX() throws MalformedURLException, IOException,
-        ParseException, DDSException, DAP2Exception
+            ParseException, DDSException, DAP2Exception
     {
 
         return getDataDDX("", new DefaultFactory());
@@ -769,7 +773,7 @@ public class DConnect2
      * @opendap.ddx.experimental
      */
     public DataDDS getDataDDX(String CE) throws MalformedURLException, IOException,
-        ParseException, DDSException, DAP2Exception
+            ParseException, DDSException, DAP2Exception
     {
 
         return getDataDDX(CE, new DefaultFactory());
@@ -796,10 +800,10 @@ public class DConnect2
      * @see BaseTypeFactory
      */
     public DataDDS getDataDDX(String CE, BaseTypeFactory btf) throws MalformedURLException, IOException,
-        ParseException, DDSException, DAP2Exception
+            ParseException, DDSException, DAP2Exception
     {
 
-        DataDDXCommand command = new DataDDXCommand(btf,this.ver);
+        DataDDXCommand command = new DataDDXCommand(btf, this.ver);
         openConnection(urlString + ".ddx" + (getCompleteCE(CE)), command);
         return command.dds;
     }
@@ -808,7 +812,7 @@ public class DConnect2
     {
         DataDDS dds;
 
-        DataDDXCommand(BaseTypeFactory btf,ServerVersion ver)
+        DataDDXCommand(BaseTypeFactory btf, ServerVersion ver)
         {
             dds = new DataDDS(ver, btf);
         }
@@ -829,7 +833,7 @@ public class DConnect2
      * the entire DDS (but without any data) while this method returns
      * only those variables listed in the projection part of the constraint
      * expression.
-     * <p/>
+     * <p>
      * Note that if CE is an empty String then the entire dataset will be
      * returned, unless a "sticky" CE has been specified in the constructor.
      *
@@ -840,8 +844,8 @@ public class DConnect2
      * @param btf      The <code>BaseTypeFactory</code> to build the member
      *                 variables in the DDS with.
      * @return The <code>DataDDS</code> object that results from applying the
-     *         given CE, combined with this object's sticky CE, on the referenced
-     *         dataset.
+     * given CE, combined with this object's sticky CE, on the referenced
+     * dataset.
      * @throws MalformedURLException if the URL given to the constructor
      *                               has an error
      * @throws IOException           if any error connecting to the remote server
@@ -850,7 +854,7 @@ public class DConnect2
      * @throws DAP2Exception         if any error returned by the remote server
      */
     public DataDDS getData(String CE, StatusUI statusUI, BaseTypeFactory btf) throws MalformedURLException, IOException,
-        ParseException, DDSException, DAP2Exception
+            ParseException, DDSException, DAP2Exception
     {
         if(CE != null && CE.trim().length() == 0) CE = null;
         DataDDS dds = new DataDDS(ver, btf);
@@ -861,9 +865,9 @@ public class DConnect2
             // See if the dods file exists
             if(dodspath.canRead()) {
       /* WARNING: any constraints are ignored in reading the file */
-              try (FileInputStream is = new FileInputStream(dodspath) ) {
-                command.process(is);
-              }
+                try (FileInputStream is = new FileInputStream(dodspath)) {
+                    command.process(is);
+                }
             }
         } else if(stream != null) {
             command.process(stream);
@@ -1147,7 +1151,7 @@ return dds;
      * the entire DDS (but without any data) while this method returns
      * only those variables listed in the projection part of the constraint
      * expression.
-     * <p/>
+     * <p>
      * Note that if CE is an empty String then the entire dataset will be
      * returned, unless a "sticky" CE has been specified in the constructor.
      *
@@ -1156,8 +1160,8 @@ return dds;
      * @param statusUI the <code>StatusUI</code> object to use for GUI updates
      *                 and user cancellation notification (may be null).
      * @return The <code>DataDDS</code> object that results from applying the
-     *         given CE, combined with this object's sticky CE, on the referenced
-     *         dataset.
+     * given CE, combined with this object's sticky CE, on the referenced
+     * dataset.
      * @throws MalformedURLException if the URL given to the constructor
      *                               has an error
      * @throws IOException           if any error connecting to the remote server
@@ -1166,7 +1170,7 @@ return dds;
      * @throws DAP2Exception         if any error returned by the remote server
      */
     public DataDDS getData(String CE, StatusUI statusUI) throws MalformedURLException, IOException,
-        ParseException, DDSException, DAP2Exception
+            ParseException, DDSException, DAP2Exception
     {
 
         return getData(CE, statusUI, new DefaultFactory());
@@ -1222,7 +1226,7 @@ return getDDXData(CE, statusUI, new DefaultFactory());
      * @param statusUI the <code>StatusUI</code> object to use for GUI updates
      *                 and user cancellation notification (may be null).
      * @return The <code>DataDDS</code> object that results from applying
-     *         this object's sticky CE, if any, on the referenced dataset.
+     * this object's sticky CE, if any, on the referenced dataset.
      * @throws MalformedURLException if the URL given to the constructor
      *                               has an error
      * @throws IOException           if any error connecting to the remote server
@@ -1231,7 +1235,7 @@ return getDDXData(CE, statusUI, new DefaultFactory());
      * @throws DAP2Exception         if any error returned by the remote server
      */
     public final DataDDS getData(StatusUI statusUI) throws MalformedURLException, IOException,
-        ParseException, DDSException, DAP2Exception
+            ParseException, DDSException, DAP2Exception
     {
         return getData("", statusUI, new DefaultFactory());
     }

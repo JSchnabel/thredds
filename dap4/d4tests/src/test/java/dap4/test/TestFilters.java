@@ -4,9 +4,9 @@ import dap4.dap4shared.ChunkInputStream;
 import dap4.core.util.*;
 import dap4.dap4shared.RequestMode;
 import dap4.servlet.Generator;
-import dap4.test.servlet.*;
-import dap4.test.util.DapTestCommon;
-import dap4.test.util.Dump;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -135,24 +135,9 @@ public class TestFilters extends DapTestCommon
     String root = null;
 
     //////////////////////////////////////////////////
-    // Constructor(s)
 
-    public TestFilters()
-        throws Exception
-    {
-        this("TestFilters");
-    }
-
-    public TestFilters(String name)
-        throws Exception
-    {
-        this(name, null);
-    }
-
-    public TestFilters(String name, String[] argv)
-        throws Exception
-    {
-        super(name);
+    @Before
+    public void setup() throws Exception {
         this.root = getDAP4Root();
         if(this.root == null)
             throw new Exception("dap4 root not found");
@@ -214,7 +199,7 @@ public class TestFilters extends DapTestCommon
 
     //////////////////////////////////////////////////
     // Junit test methods
-
+    @Test
     public void testFilters()
         throws Exception
     {
@@ -223,7 +208,7 @@ public class TestFilters extends DapTestCommon
             if(!doOneTest(testcase))
                 pass = false;
         }
-        assertTrue("***Fail: TestServletConstraints", pass);
+        Assert.assertTrue("***Fail: TestServletConstraints", pass);
     }
 
     //////////////////////////////////////////////////
@@ -248,25 +233,16 @@ public class TestFilters extends DapTestCommon
         RequestMode mode = RequestMode.DAP;
         String methodurl = testcase.makeurl(mode);
 
-        // Create request and response objects
-        FakeServlet servlet = new FakeServlet(this.datasetpath);
-        FakeServletRequest req = new FakeServletRequest(methodurl, servlet);
-        FakeServletResponse resp = new FakeServletResponse();
+	Mocker mocker = new Mocker("dap4",methodurl,this);
+	byte[] byteresult = null;
 
-        servlet.init();
-
-        // See if the servlet can process this
         try {
-            servlet.doGet(req, resp);
+	    byteresult = mocker.execute();
         } catch (Throwable t) {
             t.printStackTrace();
             return false;
         }
 
-        // Collect the output
-        FakeServletOutputStream fakestream
-            = (FakeServletOutputStream) resp.getOutputStream();
-        byte[] byteresult = fakestream.toArray();
         if(prop_debug) {
             ByteOrder order = (isbigendian ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN);
             DapDump.dumpbytes(ByteBuffer.wrap(byteresult).order(order), true);

@@ -46,6 +46,7 @@ import ucar.nc2.grib.grib1.tables.Grib1WmoTimeType;
 import ucar.nc2.*;
 import ucar.nc2.grib.*;
 import ucar.unidata.io.RandomAccessFile;
+import ucar.unidata.io.http.HTTPRandomAccessFile;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -326,9 +327,15 @@ public class Grib1Iosp extends GribIosp {
 
   @Override
   public boolean isValidFile(RandomAccessFile raf) throws IOException {
-    GribCdmIndex.GribCollectionType type = GribCdmIndex.getType(raf);
-    if (type == GribCdmIndex.GribCollectionType.GRIB1) return true;
-    if (type == GribCdmIndex.GribCollectionType.Partition1) return true;
+    if (raf instanceof HTTPRandomAccessFile) { // only do remote if memory resident
+      if (raf.length() > raf.getBufferSize())
+        return false;
+
+    } else {                                  // wont accept remote index
+      GribCdmIndex.GribCollectionType type = GribCdmIndex.getType(raf);
+      if (type == GribCdmIndex.GribCollectionType.GRIB1) return true;
+      if (type == GribCdmIndex.GribCollectionType.Partition1) return true;
+    }
 
     // check for GRIB1 data file
     return Grib1RecordScanner.isValidFile(raf);
@@ -402,8 +409,10 @@ public class Grib1Iosp extends GribIosp {
 
 
     String timeTypeName = cust.getTimeTypeName(vindex.getIntvType());
-    if ( timeTypeName != null && timeTypeName.length() != 0)
-      v.addAttribute(new Attribute(CDM.TIME_INTERVAL, timeTypeName));
+    if ( timeTypeName != null && timeTypeName.length() != 0) {
+      v.addAttribute(new Attribute("Grib1_Interval_Type", vindex.getIntvType()));
+      v.addAttribute(new Attribute("Grib1_Interval_Name", timeTypeName));
+    }
 
     if (vindex.getEnsDerivedType() >= 0)
       v.addAttribute(new Attribute("Grib1_Ensemble_Derived_Type", vindex.getEnsDerivedType()));
@@ -461,9 +470,9 @@ public class Grib1Iosp extends GribIosp {
       result2 += result2 * 37 + 4;
       result2 += result2 * 37 + pno;
 
-    System.out.printf("%d,%d%n", result, result2);
+      System.out.printf("%d,%d%n", result, result2);
 
-    Arrays.hashCode(new Object[] {1, 2, 3});
+      // Arrays.hashCode(new Object[] {1, 2, 3});
     }
 
 }

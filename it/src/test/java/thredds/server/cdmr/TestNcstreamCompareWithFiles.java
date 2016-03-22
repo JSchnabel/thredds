@@ -4,6 +4,7 @@ import org.apache.commons.io.filefilter.SuffixFileFilter;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import thredds.TestWithLocalServer;
@@ -15,6 +16,7 @@ import ucar.nc2.dataset.NetcdfDataset;
 import ucar.nc2.stream.CdmRemote;
 import ucar.nc2.stream.NcStreamWriter;
 import ucar.nc2.util.CompareNetcdf2;
+import ucar.unidata.test.util.NeedsCdmUnitTest;
 import ucar.unidata.test.util.TestDir;
 import ucar.unidata.util.StringUtil2;
 
@@ -27,6 +29,7 @@ import java.util.Formatter;
 import java.util.List;
 
 @RunWith(Parameterized.class)
+@Category(NeedsCdmUnitTest.class)
 public class TestNcstreamCompareWithFiles {
   static String contentRoot = TestDir.cdmUnitTestDir + "formats";
   static String urlPath = "cdmremote/scanCdmUnitTests/formats";
@@ -38,10 +41,10 @@ public class TestNcstreamCompareWithFiles {
     System.out.printf("success = %d/%d %n", success, total);
   }
 
-  @Parameterized.Parameters
+  @Parameterized.Parameters(name="{0}")
   public static List<Object[]> getTestParameters() {
 
-   List<Object[]>  result = new ArrayList<Object[]>(500);
+   List<Object[]>  result = new ArrayList<>(500);
 
     try {
       addFromScan(result, contentRoot +"/netcdf3/", new SuffixFileFilter(".nc"));
@@ -97,7 +100,7 @@ public class TestNcstreamCompareWithFiles {
   @Test
   public void doOne() throws IOException {
     String name = StringUtil2.substitute(filename.substring(contentRoot.length()), "\\", "/");
-    String remote = TestWithLocalServer.server + urlPath + name;
+    String remote = TestWithLocalServer.withPath(urlPath + name);
     total++;
     success += compareDatasets(filename, remote);
   }

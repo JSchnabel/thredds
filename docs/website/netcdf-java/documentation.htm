@@ -1,12 +1,12 @@
 <!doctype html public "-//w3c//dtd html 4.0 transitional//en">
 <html>
 <head>
-  <title>NetCDF Java Library Home</title>
+  <title>NetCDF-Java Library Home</title>
   <link rel="stylesheet" href="cdm.css" type="text/css"/>
 </head>
 <body>
 <h1>
-  <img src="netcdfBig.gif" width="100" height="55" alt=""> NetCDF Java Library</h1>
+  <img src="netcdfBig.gif" width="100" height="55" alt=""> NetCDF-Java Library</h1>
 
 <p><br>
   The NetCDF-Java Library is a Java interface to <a href="http://www.unidata.ucar.edu/software/netcdf/index.html">NetCDF files</a>, as well as to many other
@@ -30,7 +30,7 @@
   file format. <a href="reference/netcdf4Clibrary.html">Writing to the netCDF-4 file format</a> requires installing the netCDF C library. The NetCDF-Java library also implements <a href="http://www.unidata.ucar.edu/software/netcdf/ncml/">NcML</a>, which allows you to add metadata
   to CDM datasets, as well as to create virtual datasets through aggregation. The <a href="../tds/TDS.html">THREDDS Data Server</a> (TDS) is built on top of the NetCDF-Java library.</p>
 <p>CDM/TDS source is  hosted on <a href="https://github.com/Unidata/thredds">GitHub</a>.
-To build the latest stable version from source or contribute code  to the THREDDS project, see <a href="../tds/SourceCodeBuild.html">here</a>. Most projects use  <strong>netcdfAll.jar</strong> or <strong>toolsUI.jar</strong> (see below for links), or include the desired <a href="http://artifacts.unidata.ucar.edu/">artifacts</a> in their maven or gradle builds.  See <a href="reference/JarDependencies.html">Jar Dependencies</a> for  details.</p>
+To build the latest stable version from source or contribute code  to the THREDDS project, see <a href="tutorial/SourceCodeBuild.html">here</a>. Most projects use  <strong>netcdfAll.jar</strong> or <strong>toolsUI.jar</strong> (see below for links), or include the desired <a href="http://artifacts.unidata.ucar.edu/">artifacts</a> in their maven or gradle builds.  See <a href="reference/BuildDependencies.html">Build Dependencies</a> for  details.</p>
 <p>Unidata CDM/THREDDS Software Engineering tools:</p>
 <ul>
   <li><a href="http://artifacts.unidata.ucar.edu/">Maven repository</a> for maven artifacts</li>
@@ -39,13 +39,14 @@ To build the latest stable version from source or contribute code  to the THREDD
   <li><a href="https://bugtracking.unidata.ucar.edu/browse/TDS">JIRA</a> issue tracking</li>
   <li><a href="https://scan.coverity.com/projects/388?tab=overview">Coverity</a> static analysis</li>
 </ul>
-<h3 id="v46">Current development release version 4.6 (requires Java 7) </h3>
+
+<span id="current"/>
+<h3 id="v46">Current stable release version 4.6 (requires Java 7) </h3>
 <ul>
-  <li>The <a href="ftp://ftp.unidata.ucar.edu/pub/netcdf-java/v4.6/netcdfAll-4.6.jar">complete netCDF library jar</a> implements the full CDM model, with all
+  <li>The <a href="http://artifacts.unidata.ucar.edu/content/repositories/unidata-releases/edu/ucar/netcdfAll/4.6.4/netcdfAll-4.6.4.jar">complete netCDF library jar</a> implements the full CDM model, with all
     dependent jars included. </li>
-  <li>The <a href="ftp://ftp.unidata.ucar.edu/pub/netcdf-java/v4.6/toolsUI-4.6.jar">toolsUI.jar</a> also includes UI classes, and allows you to run the netCDF
+  <li>The <a href="http://artifacts.unidata.ucar.edu/content/repositories/unidata-releases/edu/ucar/toolsUI/4.6.4/toolsUI-4.6.4.jar">toolsUI.jar</a> also includes UI classes, and allows you to run the netCDF
     ToolsUI application directly from it such as &quot;<em>java -Xmx1g -jar toolsUI.jar</em>&quot;</li>
-  <li>The <a href="ftp://ftp.unidata.ucar.edu/pub/netcdf-java/v4.6/ncIdv-4.6.jar">ncIDV.jar</a> is for the development branch of the IDV. </li>
   <li><a href="javadoc/index.html">Public javadoc.</a> This is the public interface. Future changes to the API will attempt to remain backwards compatible
     with this API. </li>
   <li><a href="javadocAll/index.html">All javadoc</a>. This is the javadoc for all packages and all methods except private. CAREFUL, much of this will
@@ -54,7 +55,7 @@ To build the latest stable version from source or contribute code  to the THREDD
   <li>Unidata public <a href="https://artifacts.unidata.ucar.edu/content/repositories/unidata-releases/edu/ucar/">Maven repository</a> for maven artifacts </li>
   <li>All source is on <a href="https://github.com/Unidata/thredds">GitHub</a></li>
 </ul>
-<h3 id="v45">Current stable release version 4.5 (requires Java 7) </h3>
+<h3 id="v45">Previous release version 4.5 (requires Java 7) </h3>
 <ul>
   <li>The <a href="ftp://ftp.unidata.ucar.edu/pub/netcdf-java/v4.5/netcdfAll-4.5.jar">complete netCDF library jar</a> implements the full CDM model, with all
     dependent jars included. </li>
@@ -69,7 +70,7 @@ To build the latest stable version from source or contribute code  to the THREDD
   <li>Unidata public <a href="https://artifacts.unidata.ucar.edu/content/repositories/unidata-releases/edu/ucar/">Maven repository</a> for maven artifacts </li>
   <li>All source is on <a href="https://github.com/Unidata/thredds">GitHub</a></li>
 </ul>
-<h3 id="v">Previous stable release version 4.3 (requires Java 6) </h3>
+<h3 id="v">Previous release version 4.3 (requires Java 6) </h3>
 <ul>
   <li>The <a href="ftp://ftp.unidata.ucar.edu/pub/netcdf-java/v4.3/netcdfAll-4.3.jar">complete netCDF library jar</a> implements the full CDM model, with all
     dependent jars included. </li>
@@ -92,7 +93,7 @@ To build the latest stable version from source or contribute code  to the THREDD
 
 <p>Notes to GRIB users:</p>
 <ul>
-  <li><strong>We highly recommend that you use the 4.5 branch to read GRIB files. Many bug fixes and improvements are on that branch. </strong></li>
+  <li><strong>You must use 4.6+  branch to read GRIB files. Many bug fixes and improvements are on that branch. Other branches are not supported.</strong></li>
   <li>If your GRIB files are using non-WMO-standard tables, please closely examine  the output from the CDM and report  problems. Obtain the tables from the producer is possible and send them to us.</li>
   <li>Indexing has changed since 4.3 (this will be detected automatically). </li>
   <li>Evolving documentation for GRIB is at:</li>
@@ -100,9 +101,7 @@ To build the latest stable version from source or contribute code  to the THREDD
 <blockquote>
   <ul>
     <li><a href="reference/formats/GribTables.html">GribTables.html</a></li>
-    <li><a href="reference/formats/GribFiles.html">GribFiles.html</a></li>
-  </ul>
-</blockquote>
+    <li><a href="reference/formats/GribFiles.html">GribFiles.html</a></li></ul></blockquote>
 <h3>Caveats and not-so-stable APIs:</h3>
 <ul>
   <li><strong>Writing</strong> to netCDF-3 format is supported, but extended features in the CDM, e.g. groups, structures,
@@ -125,6 +124,7 @@ To build the latest stable version from source or contribute code  to the THREDD
 </ul>
 <h3>CF Conventions</h3>
 <ul>
+  <li><a href="http://thredds-test.unidata.ucar.edu/thredds/cf_examples.html">Sample CF DSG Files</a></li>
   <li><a href="http://www.cfconventions.org">CF Conventions Home page</a></li>
   <li><a href="reference/FeatureDatasets/CFpointImplement.html">Short guide to writing files using CF 1.6 discrete
     sampling features Conventions</a></li>
@@ -134,7 +134,7 @@ To build the latest stable version from source or contribute code  to the THREDD
     Format</a></li>
   <li>CF Convention Conformance Checking
     <ul>
-      <li><a href="http://cf-pcmdi.llnl.gov/conformance/compliance-checker/">http://cf-pcmdi.llnl.gov/conformance/compliance-checker/</a>
+      <li><a href="http://cfconventions.org/compliance-checker.html">http://cfconventions.org/compliance-checker.html</a>
       </li>
     </ul>
   </li>
@@ -247,10 +247,12 @@ To build the latest stable version from source or contribute code  to the THREDD
   <li><a href="http://www.verdi-tool.org/">VERDI</a> ( Community Modeling and Analysis System (CMAS) Center&nbsp;at
     the&nbsp;University of North Carolina at Chapel Hill / Argonne National Laboratory)
   </li>
+  <li>MICAPS,  Meteorological  Information Comprehensive Analysis and  Process System (National Meteorological Center, CMA, Beijing, China)</li>
+  <li>Google Earth Engine</li>
 </ul>
 <hr WIDTH="100%">
 <address>
-  <a href="NetcdfUsers.htm"><img src="nc.gif" width="64" height="64" border="0" alt=""></a> This document was last updated Sept 2014
+  <a href="NetcdfUsers.htm"><img src="nc.gif" width="64" height="64" border="0" alt=""></a> This document was last updated May 2015
 </address>
 
 </body>

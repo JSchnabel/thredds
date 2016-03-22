@@ -36,7 +36,6 @@
 package ucar.nc2.grib.collection;
 
 import thredds.featurecollection.FeatureCollectionConfig;
-import thredds.inventory.CollectionUpdateType;
 import thredds.inventory.DateExtractor;
 import thredds.inventory.MCollection;
 import ucar.nc2.grib.GribIndexCache;
@@ -105,6 +104,8 @@ public class PartitionCollectionMutable extends GribCollectionMutable {
 
     public void finish() {
       if (partList == null) return;  // nothing to do
+      if (partList.size() > nparts)
+        System.out.println("PartitionCollectionMutable partList.size() > nparts");   // might be smaller due to failed partition
 
       int[] partno = new int[nparts];
       int[] groupno = new int[nparts];
@@ -124,7 +125,7 @@ public class PartitionCollectionMutable extends GribCollectionMutable {
     }
 
     // only used by PartitionBuilder, not PartitionBuilderFromIndex
-    public void addPartition(int partno, int groupno, int varno, int ndups, int nrecords, int nmissing) {
+    public void addPartition(int partno, int groupno, int varno, int ndups, int nrecords, int nmissing, GribCollectionMutable.VariableIndex vi) {
       if (partList == null) partList = new ArrayList<>(nparts);
       partList.add(new PartitionForVariable2D(partno, groupno, varno));
       this.ndups += ndups;
@@ -210,7 +211,6 @@ public class PartitionCollectionMutable extends GribCollectionMutable {
     final String filename;
     long lastModified, fileSize;
     CalendarDate partitionDate;
-    private boolean isBad;
 
     // temporary storage while building - do not use - must call getGribCollection()()
     // GribCollection gc;
@@ -239,14 +239,6 @@ public class PartitionCollectionMutable extends GribCollectionMutable {
 
     public long getLastModified() {
       return lastModified;
-    }
-
-    public boolean isBad() {
-      return isBad;
-    }
-
-    public void setBad(boolean isBad) {
-      this.isBad = isBad;
     }
 
     public boolean isGrib1() {
@@ -339,7 +331,6 @@ public class PartitionCollectionMutable extends GribCollectionMutable {
               ", filename='" + filename + '\'' +
               ", partitionDate='" + partitionDate + '\'' +
               ", lastModified='" + CalendarDate.of(lastModified) + '\'' +
-              ", isBad=" + isBad +
               '}';
     }
 
@@ -395,9 +386,9 @@ public class PartitionCollectionMutable extends GribCollectionMutable {
   public List<String> getFilenames() {
     List<String> result = new ArrayList<>();
     for (Partition p : getPartitions()) {
-      if (p.isBad()) continue;
       result.add(p.getIndexFilenameInCache());
     }
+    Collections.sort(result);
     return result;
   }
 
@@ -409,14 +400,21 @@ public class PartitionCollectionMutable extends GribCollectionMutable {
 
   public void addPartition(MCollection dcm) {
     Partition partition = new Partition(dcm);
-    partitions.add(partition);
+    try (GribCollectionMutable gc = partition.makeGribCollection()) {  // make sure we can open the collection
+      if (gc == null)
+        logger.warn("failed to open partition {} =skipping", dcm.getCollectionName());
+      else
+        partitions.add(partition);
+    } catch (Exception e) {
+      logger.warn("failed to open partition {} -skipping", dcm.getCollectionName(), e);
+    }
   }
-
 
   public void sortPartitions() {
     Collections.sort(partitions);
     partitions = Collections.unmodifiableList(partitions);
   }
+
 
   ///////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -438,7 +436,7 @@ public class PartitionCollectionMutable extends GribCollectionMutable {
       VariableIndexPartitioned vipFrom = (VariableIndexPartitioned) from;
       assert vipFrom.partList == null; // // check if vipFrom has been finished
       for (int i=0; i<vipFrom.nparts; i++)
-        vip.addPartition(vipFrom.partnoSA.get(i), vipFrom.groupnoSA.get(i), vipFrom.varnoSA.get(i), 0, 0, 0);
+        vip.addPartition(vipFrom.partnoSA.get(i), vipFrom.groupnoSA.get(i), vipFrom.varnoSA.get(i), 0, 0, 0, vipFrom);
     }
 
     return vip;
@@ -477,7 +475,6 @@ public class PartitionCollectionMutable extends GribCollectionMutable {
       }
       f.format("%n");
     }
-
   }
 
 }

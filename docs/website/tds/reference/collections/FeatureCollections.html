@@ -36,6 +36,7 @@
   <li><a href="PointFeatures.html">Point Collections</a></li>
   <li><a href="GribCollections.html">GRIB Collections</a> </li>
   <li><a href="GribConfig.html">GRIB specific configuration</a></li>
+  <li><a href="GribCollectionFaq.html">GRIB Collection FAQs</a></li>
 </ul>
 <p>Also see:</p>
 <ul>
@@ -47,16 +48,16 @@
 that can be used inside of a <strong>dataset</strong> element can be used inside of a <strong>featureCollection</strong> element.</p>
 
 <h4>Example 1: Simple case using defaults:</h4>
-<pre>1) &lt;featureCollection name=&quot;NCEP-NAM-Polar_90km&quot; featureType=&quot;GRIB2&quot; path=&quot;grib/NCEP/NAM/Polar_90km&quot;&gt;
-2)   &lt;collection spec=&quot;/data/ldm/pub/native/grid/NCEP/NAM/Polar_90km/NAM_Polar_90km_.*\.grib2$&quot;/&gt;
+<pre>1) &lt;featureCollection name=&quot;NCEP Polar Sterographic&quot; featureType=&quot;GRIB2&quot; path=&quot;grib/NCEP/NAM/Polar_90km&quot;&gt;
+2)   &lt;collection name=&quot;NCEP-NAM-Polar_90km&quot; spec=&quot;/data/ldm/pub/native/grid/NCEP/NAM/Polar_90km/NAM_Polar_90km_.*\.grib2$&quot;/&gt;
    &lt;/featureCollection&gt;
 </pre>
 <ol>
-  <li>A GRIB2 Feature Collection dataset is defined, with the &quot;human readable&quot; name of  <em>NCEP-NAM-Polar_90km</em>. Its URL path(s) will look like <em>http://server/thredds/&lt;service&gt;/grib/NCEP/NAM/Polar_90km/...</em> The Dataset ID is automatically set to the path, so that its dataset page will be <em>http://server/thredds/catalog/grib/NCEP/NAM/Polar_90km/catalog.xml?dataset=grib/NCEP/NAM/Polar_90km</em>/...</li>
-  <li>Defines the files in the collection as any files in the directory <em>/data/ldm/pub/native/grid/NCEP/NAM/Polar_90km/</em> which match the  regular expression <em>&quot;NAM_Polar_90km_.*\.grib2$</em>&quot; . In this case, it means any filename starting with <em>&quot;NAM_Polar_90km_&quot;</em> and ending with &quot;<em>.grib2</em>&quot;. </li>
+  <li>A GRIB2 Feature Collection dataset is defined, with the &quot;human readable&quot; name of &quot;NCEP Polar Sterographic&quot;. Its URL path(s) will look like <em>http://server/thredds/&lt;service&gt;/grib/NCEP/NAM/Polar_90km/...</em> The Dataset ID is automatically set to the path, so that its dataset page will be <em>http://server/thredds/catalog/grib/NCEP/NAM/Polar_90km/catalog.xml?dataset=grib/NCEP/NAM/Polar_90km</em>/...</li>
+  <li>Defines the files in the collection as any files in the directory <em>/data/ldm/pub/native/grid/NCEP/NAM/Polar_90km/</em> which match the  regular expression <em>&quot;NAM_Polar_90km_.*\.grib2$</em>&quot; . In this case, it means any filename starting with <em>&quot;NAM_Polar_90km_&quot;</em> and ending with &quot;<em>.grib2</em>&quot;. The collection name is &quot;NCEP-NAM-Polar_90km&quot;, which is used for index file names etc.</li>
 </ol>
 <h4>Example 2: More fully specify the options explicitly:</h4>
-<pre>&lt;featureCollection name=&quot;NCEP-NAM-Alaska_11km&quot; featureType=&quot;GRIB2&quot; path=&quot;grib/NCEP/NAM/Alaska_11km&quot;&gt;
+<pre>&lt;featureCollection name=&quot;NCEP NAM Alaska(11km)&quot; featureType=&quot;GRIB2&quot; path=&quot;grib/NCEP/NAM/Alaska_11km&quot;&gt;
   &lt;metadata inherited=&quot;true&quot;&gt;<br />1)  &lt;serviceName&gt;GribServices&lt;/serviceName&gt;
 2)  &lt;documentation type=&quot;summary&quot;&gt;NCEP GFS Model : AWIPS 230 (G) Grid. Global Lat/Lon grid&lt;/documentation&gt;<br />  &lt;/metadata&gt;
 
@@ -100,7 +101,7 @@ Here is an example
     &lt;keyword&gt;surface observations&lt;/keyword&gt;
    &lt;/metadata&gt;
  
-3) &lt;collection spec=&quot;/data/ldm/pub/decoded/netcdf/surface/metar/Surface_METAR_#yyyyMMdd_HHmm#.nc$&quot; /&gt;
+3) &lt;collection name=&quot;metars&quot; spec=&quot;/data/ldm/pub/decoded/netcdf/surface/metar/Surface_METAR_#yyyyMMdd_HHmm#.nc$&quot; /&gt;
 4) &lt;update startup=&quot;test&quot; rescan=&quot;0 0/15 * * * ? *&quot;/&gt;
 5) &lt;protoDataset choice=&quot;Penultimate&quot; /&gt;
 6) &lt;pointConfig datasetTypes=&quot;cdmrFeature Files&quot;/&gt;
@@ -156,19 +157,12 @@ The XML Schema for the <em>collection</em> element:
     characters of the filename to create a date. A DateExtractor can also be defined in the <a href="CollectionSpecification.html">collection specification</a>
     string, but in that case the date must be contained just in the file name, as opposed to the complete file path which includes all of the parent directory
     names. <em>Use this OR a date extractor in the specification string, but not both.</em></li>
-  <li><strong>timePartition</strong> (optional): [ <em>directory</em> | <em>file</em> | <em>none</em>] : This defines the time intervals from which the collection is partitioned. This is used for very large datasets, and it has far reaching effects on how your data is processed and presented.
-  The values may be:
-    <ol>
-    <li><strong>none:</strong> all files are scanned in, then divided into partitions based on the time period (if needed) and a collection level index is built.</li>
-    <li><strong>directory:</strong> each directory is a partition<strong>. default</strong></li>
-    <li><strong>file: </strong>each file is a partition.</li>
-  </ol>
-  </li>
+  <li><strong>timePartition</strong> (optional): Currently only used by GRIB collections, see <a href="Partitions.html">here</a> for more info.</li>
 </ol>
 <h3>Date Extractor<a name="dateExtractor" id="dateExtractor"></a></h3>
 
-<p>Feature Collections need to know how to sort the collection of files, so it is strongly recommended that you have a date in the filename, and to specify a
-  date extractor in the specification string or include a dateFormatMark attribute. Otherwise, files will be sorted by filename.</p>
+<p>Feature Collections sometimes (Point, FMRC (ususally), and time partitioned GRIB) need to know how to sort the collection of files, and in those cases you need to have a date in the filename, and to specify a
+  date extractor in the specification string or include a dateFormatMark attribute.</p>
 
 <p>1. If the date is in the filename only, you can use the <a href="CollectionSpecification.html">collection specification</a> string, aka a <strong><em>spec</em></strong>:</p>
 <blockquote>
@@ -272,13 +266,24 @@ The XML Schema definition for the <em>protoDataset</em> element:
 <ol>
   <li><strong>startup</strong>: [<em>never</em> | <em>nocheck</em> | <em>testIndexOnly</em> | <em>test</em> | <em>always</em>] The collection is always read in on server startup. This attribute controls whether the collection index is tested and rebuilt.
     <ul>
-      <li>If &quot;<em>never</em>&quot;, the collection index is always used and must exist. Use this for very large collections that you dont want to inadvertently scan.</li>
-      <li>If &quot;<em>nocheck</em>&quot;, the collection index is  used if it exists, without checking whether its up-to-date. <strong>This is the default.</strong></li>
-      <li>If
-      &quot;<em>testIndexOnly</em>&quot;, the collection index is  used if it exists and it is newer than all of its immediate children. (<strong>experimental</strong>)</li>
-      <li>If
-      &quot;<em>test</em>&quot; or &quot;<em>true</em>&quot;, the collection is scanned and the new collection of children is compared to the old collection. If there are any changes the index is rebuilt.</li>
-      <li>If &quot;<em>always</em>&quot;, the collection is always rescanned and the indices are rebuilt. </li>
+      <li>For GRIB:
+        <ul>
+        <li>If &quot;<em>never</em>&quot;, the collection index is always used and must exist. Use this for very large collections that you dont want to inadvertently scan.</li>
+        <li>If &quot;<em>nocheck</em>&quot;, the collection index is  used if it exists, without checking whether its up-to-date. <strong>This is the default.</strong></li>
+        <li>If
+        &quot;<em>testIndexOnly</em>&quot;, the collection index is  used if it exists and it is newer than all of its immediate children. (<strong>experimental</strong>)</li>
+        <li>If
+        &quot;<em>test</em>&quot; or &quot;<em>true</em>&quot;, the collection is scanned and the new collection of children is compared to the old collection. If there are any changes the index is rebuilt.</li>
+        <li>If &quot;<em>always</em>&quot;, the collection is always rescanned and the indices are rebuilt. </li>
+        </ul>
+      </li>
+      <li>For FMRC:
+      <ul>
+        <li>If
+          &quot;<em>test</em>&quot; or &quot;<em>true</em>&quot;, the collection is scanned and the new collection of children is compared to the old collection. If there are any changes the index is rebuilt.</li>
+        <li>If &quot;<em>nocheck</em>&quot;, the collection index is  used if it exists, without checking whether its up-to-date. <strong>This is the default.</strong></li>
+      </ul>
+      </li>
     </ul>
   </li>
 
@@ -313,8 +318,9 @@ The XML Schema definition for the <em>protoDataset</em> element:
 <ol>
   <li>You must give the role &quot;tdsTrigger&quot; to any user who you want to have the right to send a trigger.</li>
   <li>You can see a list of the Feature Collection datasets (and manually trigger a rescan) on the page <strong>https://server:port/thredds/admin/debug?Collections/showCollection</strong></li>
-  <li>The URL for the actual trigger is <strong>https://server:port/thredds/admin/collection/trigger?collection=&lt;<em>name</em>&gt;</strong>, where <em>name</em> is the collection name. This does a rescan, and updates if anything has changed. </li>
-  <li>The TDM uses the trigger <strong>https://server:port/thredds/admin/collection/trigger?collection=&lt;<em>name</em>&gt;&amp;nocheck</strong> . This
+  <li>The URL for the actual trigger is <strong>https://server:port/thredds/admin/collection/trigger?collection=<em>name</em>&amp;trigger=<em>type</em></strong>,
+    where <em>name</em> is the collection name, and <em>type</em> is a collectionUpdateType (see update element above). This does a rescan, and updates if anything has changed. </li>
+  <li>The TDM uses the trigger <strong>https://server:port/thredds/admin/collection/trigger?collection=<em>name</em>&amp;trigger=nocheck</strong>. This
     does not rescan the directory, it simply recreates the dataset using the current index. </li>
   <li>Also see <a href="../RemoteManagement.html">enabling Remote Management</a></li>
 </ol>
@@ -450,7 +456,7 @@ The XML Schema definition for the <em>protoDataset</em> element:
 <p></p>
 <hr width="100%"/>
 <address>
-  <img src="../../thread.png" width="76" height="67"/> This document was last updated October 2014
+  <img src="../../thread.png" width="76" height="67"/> This document was last updated April 2015
 </address>
 </body>
 </html>

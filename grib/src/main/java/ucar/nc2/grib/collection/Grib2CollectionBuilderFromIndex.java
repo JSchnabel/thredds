@@ -93,6 +93,14 @@ class Grib2CollectionBuilderFromIndex extends GribCollectionBuilderFromIndex {
     super( new GribCollectionMutable(name, null, config, false), logger);  // directory will be set in readFromIndex
   }
 
+  protected int getVersion() {
+    return Grib2CollectionWriter.version;
+  }
+
+  protected int getMinVersion() {
+    return Grib2CollectionWriter.minVersion;
+  }
+
   ////////////////////////////////////////////////////////////////////////////////////////////////////
   // reading
 

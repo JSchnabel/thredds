@@ -85,8 +85,9 @@ public class TestGribIndexCreationOther {
   }
 
   @Ignore("B: not visible on spock")
- @Test
+  @Test
   public void testRadarNWS() throws IOException {
+    GribIosp.setDebugFlags(new DebugFlagsImpl("Grib/debugGbxIndexOnly"));
     FeatureCollectionConfig config = new FeatureCollectionConfig("radarNWS", "test/radarNWS", FeatureCollectionType.GRIB1,
  //           TestDir.cdmUnitTestDir + "gribCollections/www/.*grib2",
             "B:/lead/radar/**/.*gbx9",  null,
@@ -96,6 +97,7 @@ public class TestGribIndexCreationOther {
     org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("test");
     boolean changed = GribCdmIndex.updateGribCollection(config, CollectionUpdateType.always, logger);
     System.out.printf("changed = %s%n", changed);
+    GribIosp.setDebugFlags(new DebugFlagsImpl(""));
   }
 
   @Ignore("B: not visible on spock")
@@ -230,5 +232,108 @@ public class TestGribIndexCreationOther {
     GribIosp.setDebugFlags(new DebugFlagsImpl());
   }
 
+  @Ignore("B: not visible on spock")
+  @Test
+  public void testRDAds628p1_fcst_surf125_var() throws IOException {
+    FeatureCollectionConfig config = new FeatureCollectionConfig("ds628p1_fcst_surf125_var", "rdavm/ds628p1_fcst_surf125_var", FeatureCollectionType.GRIB1,
+            "B:/rdavm/ds628.1_fcst_surf125_var/fcst_surf125_var\\..*195812$", null, null, null, null, null);
+    // config.gribConfig.setOption("timeUnit", "1 minute");
+
+    org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("test");
+    boolean changed = GribCdmIndex.updateGribCollection(config, CollectionUpdateType.always, logger);
+    System.out.printf("changed = %s%n", changed);
+  }
+
+  @Ignore("B: not visible on spock")
+  @Test
+  public void testRDAds131() throws IOException {
+    FeatureCollectionConfig config = new FeatureCollectionConfig("testRDAds131", "rdavm/testRDAds131", FeatureCollectionType.GRIB1,
+            "B:/rdavm/ds131.1/sflxfg_mean/.*grib$", null, null, null, null, null);
+    config.gribConfig.setUseTableVersion(true);
+
+    org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("test");
+    boolean changed = GribCdmIndex.updateGribCollection(config, CollectionUpdateType.always, logger);
+    System.out.printf("changed = %s%n", changed);
+  }
+
+   @Ignore("B: not visible on spock")
+   @Test
+   public void testCarlosMoraga() throws IOException {
+     FeatureCollectionConfig config = new FeatureCollectionConfig("CarlosMoragaEcmwf", "CarlosMoragaEcmwf", FeatureCollectionType.GRIB1,
+             "B:/testdata/support/CarlosMoraga/ECMWF_GNERA.*", null, null, null, null, null);
+
+     org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("test");
+     boolean changed = GribCdmIndex.updateGribCollection(config, CollectionUpdateType.always, logger);
+     System.out.printf("changed = %s%n", changed);
+   }
+
+  @Ignore("B: not visible on spock")
+  @Test
+  public void testNcdcNarr() throws IOException {
+    GribIosp.setDebugFlags(new DebugFlagsImpl("Grib/debugGbxIndexOnly"));
+    FeatureCollectionConfig config = new FeatureCollectionConfig("NcdcNarr", "NcdcNarr", FeatureCollectionType.GRIB1,
+            "B:/ncdc/0402/home/tomcat/dans-tdm-content/content/tdm/cache/GribIndex/global/nomads/nexus/narr/**/.*gbx9", null, null, null, null, null);
+    config.setFilter("B:/ncdc/0402/home/tomcat/dans-tdm-content/content/tdm/cache/GribIndex/global/nomads/nexus/narr/", "\\d{6}/\\d{8}/.*gbx9$");
+    org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("test");
+    boolean changed = GribCdmIndex.updateGribCollection(config, CollectionUpdateType.always, logger);
+    System.out.printf("changed = %s%n", changed);
+    GribIosp.setDebugFlags(new DebugFlagsImpl());
+  }
+
+  // String name, String path, FeatureCollectionType fcType, String spec, String collectionName, String dateFormatMark, String olderThan, String timePartition, Element innerNcml
+  @Ignore("B: not visible on spock")
+  @Test
+  public void testNam20() throws IOException {
+    GribIosp.setDebugFlags(new DebugFlagsImpl("Grib/debugGbxIndexOnly"));
+    FeatureCollectionConfig config = new FeatureCollectionConfig("Nam10", "Nam10", FeatureCollectionType.GRIB1,
+            "B:/atm/nam20/.*gbx9", null, null, null, "file", null);
+    org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("test");
+    boolean changed = GribCdmIndex.updateGribCollection(config, CollectionUpdateType.testIndexOnly, logger);
+    System.out.printf("changed = %s%n", changed);
+    GribIosp.setDebugFlags(new DebugFlagsImpl());
+  }
+
+
+  // String name, String path, FeatureCollectionType fcType, String spec, String collectionName, String dateFormatMark, String olderThan, String timePartition, Element innerNcml
+  @Ignore("B: not visible on spock")
+  @Test
+  public void testNdfdNoaaport() throws IOException {
+    GribIosp.setDebugFlags(new DebugFlagsImpl("Grib/debugGbxIndexOnly"));
+    FeatureCollectionConfig config = new FeatureCollectionConfig("ndfdNoaaport", "ndfdNoaaport", FeatureCollectionType.GRIB2,
+            "B:/atm/ndfd/.*gbx9", null, null, null, "file", null);
+    config.gribConfig.addGdsHash("-1506003048","-1505079527");
+
+    org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("test");
+    boolean changed = GribCdmIndex.updateGribCollection(config, CollectionUpdateType.always, logger);
+    System.out.printf("changed = %s%n", changed);
+    GribIosp.setDebugFlags(new DebugFlagsImpl());
+  }
+
+  // String name, String path, FeatureCollectionType fcType, String spec, String collectionName, String dateFormatMark, String olderThan, String timePartition, Element innerNcml
+  @Ignore("B: not visible on spock")
+  @Test
+  public void testNcdcGfsanl3() throws IOException {
+    GribIosp.setDebugFlags(new DebugFlagsImpl("Grib/debugGbxIndexOnly"));
+    FeatureCollectionConfig config = new FeatureCollectionConfig("Gfs003anl", "Gfs003anl", FeatureCollectionType.GRIB1,
+            "B:/ncdc/0416/indexes/gfsanl3/**/gfsanl_3_.*gbx9", null, null, null, null, null);
+
+    org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("test");
+    boolean changed = GribCdmIndex.updateGribCollection(config, CollectionUpdateType.always, logger);
+    System.out.printf("changed = %s%n", changed);
+    GribIosp.setDebugFlags(new DebugFlagsImpl());
+  }
+
+  @Ignore("B: not visible on spock")
+  @Test
+  public void testNcdcGfsanl4() throws IOException {
+    GribIosp.setDebugFlags(new DebugFlagsImpl("Grib/debugGbxIndexOnly"));
+    FeatureCollectionConfig config = new FeatureCollectionConfig("Gfs004anl", "Gfs004anl", FeatureCollectionType.GRIB2,
+            "B:/ncdc/0416/indexes/gfsanl3/**/gfsanl_4_.*gbx9", null, null, null, null, null);
+
+    org.slf4j.Logger logger = org.slf4j.LoggerFactory.getLogger("test");
+    boolean changed = GribCdmIndex.updateGribCollection(config, CollectionUpdateType.always, logger);
+    System.out.printf("changed = %s%n", changed);
+    GribIosp.setDebugFlags(new DebugFlagsImpl());
+  }
 
 }

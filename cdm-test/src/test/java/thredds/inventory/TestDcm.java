@@ -34,6 +34,7 @@ package thredds.inventory;
 
 import org.junit.Ignore;
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import thredds.featurecollection.FeatureCollectionConfig;
@@ -42,12 +43,11 @@ import thredds.inventory.filter.StreamFilter;
 import thredds.inventory.partition.DirectoryCollection;
 import ucar.nc2.time.CalendarDate;
 import ucar.nc2.util.Misc;
+import ucar.unidata.test.util.NeedsCdmUnitTest;
 import ucar.unidata.test.util.TestDir;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Formatter;
 import java.util.List;
 
@@ -57,6 +57,7 @@ import java.util.List;
  * @author caron
  * @since 6/20/11
  */
+@Category(NeedsCdmUnitTest.class)
 public class TestDcm {
 
   @Test
@@ -139,7 +140,7 @@ public class TestDcm {
     // String topCollectionName, String topDirS, String olderThan, org.slf4j.Logger logger
     Logger logger = LoggerFactory.getLogger("testOlderThanInDirectoryCollection");
     DirectoryCollection dcm = new DirectoryCollection("topCollectionName", specp.getRootDir(), true, config.olderThan, logger);
-    dcm.setStreamFilter(new StreamFilter(java.util.regex.Pattern.compile(".*grib2")));
+    dcm.setStreamFilter(new StreamFilter(java.util.regex.Pattern.compile(".*grib2"), true));
 
     List<String> fileList = dcm.getFilenames();
     for (String name : fileList)

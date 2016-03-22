@@ -39,6 +39,7 @@
 package ucar.nc2.iosp.grib;
 
 import org.junit.Test;
+import org.junit.experimental.categories.Category;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import ucar.ma2.Array;
@@ -48,12 +49,12 @@ import ucar.nc2.Group;
 import ucar.nc2.NetcdfFile;
 import ucar.nc2.Variable;
 import ucar.nc2.grib.collection.GribIosp;
+import ucar.unidata.test.util.NeedsCdmUnitTest;
 import ucar.unidata.test.util.TestDir;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 
 /*
  * TestIntervalsTimeCoords tests the different type of Grib intervals.
@@ -76,9 +77,10 @@ import java.util.HashMap;
  *
  */
 @RunWith(Parameterized.class)
+@Category(NeedsCdmUnitTest.class)
 public class TestIntervalsTimeCoords2D {
 
-  @Parameterized.Parameters
+  @Parameterized.Parameters(name="{0}")
   public static Collection<Object[]> getTestParameters() throws IOException {
     Collection<Object[]> params = new ArrayList<>();
     params.add(new Object[]{TestDir.cdmUnitTestDir + "tds/ncep/GFS_Puerto_Rico_191km_20100515_0000.grib1", "VAR_7-0-2-61_L1_I12_Hour_S4", bounds0, 2}); // Total_precipitation_surface_12_Hour_Accumulation
@@ -308,7 +310,6 @@ public class TestIntervalsTimeCoords2D {
   };
 
   static int[][] bounds4 = {
-          {0, 0},
           {0, 1},
           {0, 2},
           {1, 2},

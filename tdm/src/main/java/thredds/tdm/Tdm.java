@@ -36,7 +36,6 @@
 package thredds.tdm;
 
 import org.apache.http.auth.*;
-import org.apache.http.client.CredentialsProvider;
 import org.slf4j.Logger;
 import org.springframework.context.support.FileSystemXmlApplicationContext;
 import org.springframework.core.io.FileSystemResource;
@@ -46,16 +45,13 @@ import thredds.featurecollection.FeatureCollectionConfig;
 import thredds.featurecollection.FeatureCollectionType;
 import thredds.inventory.*;
 import thredds.util.*;
+import ucar.httpservices.*;
 import ucar.nc2.constants.CDM;
 import ucar.nc2.grib.GribIndexCache;
 import ucar.nc2.grib.collection.GribCdmIndex;
 import ucar.nc2.time.CalendarDate;
 import ucar.nc2.util.DiskCache2;
 import ucar.nc2.util.log.LoggerFactory;
-import ucar.httpservices.HTTPException;
-import ucar.httpservices.HTTPFactory;
-import ucar.httpservices.HTTPMethod;
-import ucar.httpservices.HTTPSession;
 import ucar.unidata.io.RandomAccessFile;
 
 import java.io.File;
@@ -76,8 +72,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @since 12/13/13
  */
 public class Tdm {
-  private static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger( Tdm.class);
+  private static org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(Tdm.class);
   private static final boolean debug = false;
+  private static final boolean debugOpenFiles = false;
 
   private Path contentDir;
   private Path contentThreddsDir;
@@ -86,6 +83,7 @@ public class Tdm {
 
   private String user, pass;
   private boolean sendTriggers;
+  private String[] serverNames;
   private List<Server> servers;
 
   private java.util.concurrent.ExecutorService executor;
@@ -96,6 +94,7 @@ public class Tdm {
   private boolean forceOnStartup = false; // if true, just show dirs and exit
 
   LoggerFactory loggerFactory;
+  List<Resource> catalogRoots = new ArrayList<>();
 
   private static class Server {
     String name;
@@ -105,7 +104,7 @@ public class Tdm {
       this.name = name;
       this.session = session;
       System.out.printf("Server added %s%n", name);
-      log.info("TDS server added "+name);
+      log.info("TDS server added " + name);
     }
   }
 
@@ -125,6 +124,7 @@ public class Tdm {
 
   public void setNThreads(int n) {
     executor = Executors.newFixedThreadPool(n);
+    log.info(" TDM nthreads= {}", n);
   }
 
   public void setForceOnStartup(boolean forceOnStartup) {
@@ -144,37 +144,36 @@ public class Tdm {
     this.catalog = catalog;
   }
 
-  public void setServerNames(String[] serverNames) throws HTTPException {
+  public void setServerNames(String[] serverNames) {
+    this.serverNames = serverNames;
+  }
+
+  public void initServers() throws HTTPException {
     if (serverNames == null) {
       servers = new ArrayList<>(); // empty list
       return;
     }
 
-    servers = new ArrayList<>(serverNames.length);
-    for (String name : serverNames) {
-      HTTPSession session = new HTTPSession(name);
-      // AuthScope scope = new AuthScope(ANY_HOST, -1, ANY_REALM, "Digest");
-      session.setCredentialsProvider(new CredentialsProvider() {
-         public Credentials getCredentials(AuthScope scope)
-         {
-           //System.out.printf("getCredentials called %s %s%n", user, pass);
-           return new UsernamePasswordCredentials(user, pass);
-         }
-         public void setCredentials(AuthScope scope, Credentials creds) {}
-         public void clear() {}
-       });
-
-      session.setUserAgent("TDM");
-      servers.add(new Server(name, session));
+    this.servers = new ArrayList<>(this.serverNames.length);
+    for (String name : this.serverNames) {
+      try (HTTPSession session = HTTPFactory.newSession(name)) {
+        if (user != null && pass != null)
+          session.setCredentials(new UsernamePasswordCredentials(user, pass));
+        session.setUserAgent("TDM");
+        servers.add(new Server(name, session));
+      }
     }
   }
 
   AliasHandler aliasHandler;
+
   public void setPathAliasReplacements(List<PathAliasReplacement> aliasExpanders) {
     aliasHandler = new AliasHandler(aliasExpanders);
   }
 
-  boolean init() {
+  boolean init() throws HTTPException {
+    initServers();
+
     System.setProperty("tds.log.dir", contentTdmDir.toString());
 
     if (!Files.exists(threddsConfig)) {
@@ -184,8 +183,12 @@ public class Tdm {
     }
     ThreddsConfigReader reader = new ThreddsConfigReader(threddsConfig.toString(), log);
 
-   // LOOK following has been duplicated from tds cdmInit
+    for (String location : reader.getRootList("catalogRoot")) {
+      Resource r = new FileSystemResource(contentThreddsDir.toString() + "/" + location);
+      catalogRoots.add(r);
+    }
 
+    // LOOK following has been duplicated from tds cdmInit
     // 4.3.17
     long maxFileSize = reader.getBytes("FeatureCollection.RollingFileAppender.MaxFileSize", 1000 * 1000);
     int maxBackupIndex = reader.getInt("FeatureCollection.RollingFileAppender.MaxBackups", 10);
@@ -203,48 +206,55 @@ public class Tdm {
     gribCache.setAlwaysUseCache(gribIndexAlwaysUse);
     gribCache.setNeverUseCache(gribIndexNeverUse);
     GribIndexCache.setDiskCache2(gribCache);
-    log.info("TDM set "+gribCache);
+    log.info("TDM set " + gribCache);
 
     return true;
   }
 
   void start() throws IOException {
-     System.out.printf("Tdm startup at %s%n", new Date());
+    System.out.printf("Tdm startup at %s%n", new Date());
 
-     //CatalogConfigReader reader = new CatalogConfigReader(catalog, aliasExpanders);
-     CatalogConfigReader reader = new CatalogConfigReader(catalog, aliasHandler);
-     List<FeatureCollectionConfig> fcList = reader.getFcList();
+    List<FeatureCollectionConfig> fcList = new ArrayList<>();
+    CatalogConfigReader reader = new CatalogConfigReader(catalog, aliasHandler);
+    fcList.addAll(reader.getFcList());
 
-     if (showOnly) {
-       List<String> result = new ArrayList<>();
-       for (FeatureCollectionConfig config : fcList) {
-         result.add(config.collectionName);
-       }
-       Collections.sort(result);
+    // do the catalogRoots
+    for (Resource catr : catalogRoots) {
+      CatalogConfigReader r = new CatalogConfigReader(catr, aliasHandler);
+      fcList.addAll(r.getFcList());
+    }
 
-       System.out.printf("%nFeature Collection names:%n");
-       for (String name : result)
-         System.out.printf(" %s%n", name);
+    if (showOnly) {
+      List<String> result = new ArrayList<>();
+      for (FeatureCollectionConfig config : fcList) {
+        result.add(config.collectionName);
+      }
+      Collections.sort(result);
 
-       System.out.printf("%nTriggers:%n");
-       for (String name : result)
-         System.out.printf(" %s%n", makeTriggerUrl(name));
+      System.out.printf("%nFeature Collection names:%n");
+      for (String name : result)
+        System.out.printf(" %s%n", name);
 
-       executor.shutdown();
-       return;
-     }
+      System.out.printf("%nTriggers:%n");
+      for (String name : result)
+        System.out.printf(" %s%n", makeTriggerUrl(name));
 
-     for (FeatureCollectionConfig config : fcList) {
-       if (config.type != FeatureCollectionType.GRIB1 && config.type != FeatureCollectionType.GRIB2) continue;
-       System.out.printf("FeatureCollection %s scheduled %n", config.collectionName);
+      executor.shutdown();
+      CollectionUpdater.INSTANCE.shutdown();
+      return;
+    }
 
-       if (forceOnStartup) // on startup, force rewrite of indexes
-         config.tdmConfig.startupType = CollectionUpdateType.always;
+    for (FeatureCollectionConfig config : fcList) {
+      if (config.type != FeatureCollectionType.GRIB1 && config.type != FeatureCollectionType.GRIB2) continue;
+      System.out.printf("FeatureCollection %s scheduled %n", config.collectionName);
 
-       Logger logger = loggerFactory.getLogger("fc." + config.collectionName); // seperate log file for each feature collection (!!)
-       logger.info("FeatureCollection config=" + config);
-       CollectionUpdater.INSTANCE.scheduleTasks(config, new Listener(config, logger), logger); // now wired for events
-     }
+      if (forceOnStartup) // on startup, force rewrite of indexes
+        config.tdmConfig.startupType = CollectionUpdateType.always;
+
+      Logger logger = loggerFactory.getLogger("fc." + config.collectionName); // seperate log file for each feature collection (!!)
+      logger.info("FeatureCollection config=" + config);
+      CollectionUpdater.INSTANCE.scheduleTasks(config, new Listener(config, logger), logger); // now wired for events
+    }
 
      /* show whats up
      Formatter f = new Formatter();
@@ -254,7 +264,7 @@ public class Tdm {
        f.format("  %s == %s%n%s%n%n", fc, fc.getClass().getName(), dcm);
      }
      System.out.printf("%s%n", f.toString()); */
-   }
+  }
 
   // these objects listen for schedule events from quartz.
   // one listener for each fc.
@@ -342,43 +352,43 @@ public class Tdm {
           logger.warn("Listener InUse should have been set");
       }
 
-      List<String> openFiles = RandomAccessFile.getOpenFiles();
-      if (openFiles.size() > 0) {
-        System.out.printf("Open Files%n");
-        for (String filename : RandomAccessFile.getOpenFiles()) {
-          System.out.printf("  %s%n", filename);
+      if (debugOpenFiles) {
+        List<String> openFiles = RandomAccessFile.getOpenFiles();
+        if (openFiles.size() > 0) {
+          System.out.printf("Open Files%n");
+          for (String filename : RandomAccessFile.getOpenFiles()) {
+            System.out.printf("  %s%n", filename);
+          }
+          System.out.printf("End Open Files%n");
         }
-        System.out.printf("End Open Files%n");
       }
 
     }
 
-    private void sendTriggers(String path) {
-      for (Server server : servers) {
+    private void sendTriggers(String path)
+    {
+      for(Server server : servers) {
         String url = server.name + path;
-        HTTPMethod m = null;
         try {
-          m = HTTPFactory.Get(server.session, url);
-          int status = m.execute();
-          if (status == 200)
-            logger.info("send trigger to {} status = {}", url, status);
-          else
-            logger.warn("FAIL send trigger to {} status = {}", url, status);
-
+          try (HTTPMethod m = HTTPFactory.Get(server.session, url)) {
+            int status = m.execute();
+            if(status == 200)
+              logger.info("send trigger to {} status = {}", url, status);
+            else
+              logger.warn("FAIL send trigger to {} status = {}", url, status);
+          }
         } catch (HTTPException e) {
           Throwable cause = e.getCause();
-          if (cause instanceof ConnectException) {
+          if(cause instanceof ConnectException) {
             logger.warn("server {} not running", server.name);
           } else {
             e.printStackTrace();
             logger.error("FAIL send trigger to " + url + " failed", cause);
           }
 
-        } finally {
-          if (m != null) m.close();
         }
-      }
 
+      }
     }
 
     /* private void doManage(String deleteAfterS) throws IOException {
@@ -416,7 +426,7 @@ public class Tdm {
   }
 
 
-    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
   /* public static void main2(String[] args) throws IOException {
     long start = System.currentTimeMillis();
